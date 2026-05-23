@@ -1,0 +1,47 @@
+name: Review Agent
+
+on:
+  schedule:
+    - cron: "0 9 * * 1-5" # 평일 오후 6시 KST (UTC 9시)
+  workflow_dispatch:
+
+jobs:
+  review-agent:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: Checkout dev branch
+        uses: actions/checkout@v4
+        with:
+          ref: dev
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install Claude Code
+        run: npm install -g @anthropic-ai/claude-code
+
+      - name: Run Review Agent
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          claude --dangerously-skip-permissions -p "
+          Read CLAUDE.md and tasks/review-agent-daily.md first.
+          Check all open feat/* and fix/* branches.
+          Review each branch against the checklist in review-agent-daily.md.
+          Merge passing branches into dev.
+          If today is Friday, create a PR from dev to main.
+          " || true
+
+      - name: Configure git
+        run: |
+          git config user.email "agent@snaptospec.com"
+          git config user.name "Review Agent"

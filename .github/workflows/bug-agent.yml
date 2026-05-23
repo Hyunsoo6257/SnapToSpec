@@ -1,0 +1,62 @@
+name: Bug Agent
+
+on:
+  schedule:
+    - cron: "0 5 * * 1-5" # 평일 오후 2시 KST (UTC 5시)
+  workflow_dispatch:
+
+jobs:
+  bug-agent:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: Checkout dev branch
+        uses: actions/checkout@v4
+        with:
+          ref: dev
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install Claude Code
+        run: npm install -g @anthropic-ai/claude-code
+
+      - name: Create fix branch
+        run: |
+          BRANCH="fix/bug-agent-$(date +%Y%m%d)"
+          git checkout -b $BRANCH
+          echo "BRANCH=$BRANCH" >> $GITHUB_ENV
+
+      - name: Run Bug Agent
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          PROJECT_NAME: ${{ secrets.PROJECT_NAME }}
+          NODE_ENV: ${{ secrets.NODE_ENV }}
+          ALLOWED_CORS_ORIGIN: ${{ secrets.ALLOWED_CORS_ORIGIN }}
+          FRONTEND_BASE_URL: ${{ secrets.FRONTEND_BASE_URL }}
+        run: |
+          claude --dangerously-skip-permissions -p "
+          Read CLAUDE.md first.
+          Then read tasks/bug-agent-daily.md and execute all scan items.
+          Only commit and push if there are actual fixes. No empty commits.
+          " || true
+
+      - name: Push if changes exist
+        run: |
+          git config user.email "agent@snaptospec.com"
+          git config user.name "Bug Agent"
+          if [ -n "$(git status --porcelain)" ]; then
+            git push origin $BRANCH
+          else
+            echo "No changes found, skipping push"
+          fi
