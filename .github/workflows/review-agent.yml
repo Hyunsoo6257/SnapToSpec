@@ -2,7 +2,7 @@ name: Review Agent
 
 on:
   schedule:
-    - cron: "0 9 * * 1-5" # 평일 오후 6시 KST (UTC 9시)
+    - cron: "0 8 * * *" # 매일 오후 6시 Brisbane AEST (UTC+10 = UTC 08:00)
   workflow_dispatch:
 
 jobs:
@@ -25,6 +25,11 @@ jobs:
         with:
           node-version: "20"
 
+      - name: Configure git
+        run: |
+          git config user.email "agent@snaptospec.com"
+          git config user.name "Review Agent"
+
       - name: Install Claude Code
         run: npm install -g @anthropic-ai/claude-code
 
@@ -37,11 +42,6 @@ jobs:
           Read CLAUDE.md and tasks/review-agent-daily.md first.
           Check all open feat/* and fix/* branches.
           Review each branch against the checklist in review-agent-daily.md.
-          Merge passing branches into dev.
-          If today is Friday, create a PR from dev to main.
+          For each passing branch: merge into dev AND create a PR with a clear summary of what was implemented.
+          If today (Brisbane AEST) is Sunday: create a PR from dev to main as a weekly release.
           " || true
-
-      - name: Configure git
-        run: |
-          git config user.email "agent@snaptospec.com"
-          git config user.name "Review Agent"

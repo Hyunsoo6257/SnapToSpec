@@ -1,40 +1,105 @@
-# Bug Agent — Daily Task (runs at 2pm KST weekdays)
+# Bug Agent — Daily Task
 
 ## Role
-Scan the entire codebase for bugs, rule violations, and code quality issues.
-Push fixes to a fix/* branch.
+Verify that implemented features actually work. Fix what's broken.
+Do NOT scan for code style issues. No token waste.
 
-## Execution Order
+All output (commit messages, PR titles, PR descriptions, comments) must be in English.
 
-### 1. Pull latest dev branch
+---
+
+## Step 1: Determine current implementation state
+
+Read `tasks/progress.md` to understand what has been built.
+If missing, inspect the directory structure:
+
+```
+backend/src/main.ts absent          → backend not implemented
+backend/src/main.ts present         → backend implemented
+backend/src/module/spec-extraction  → Claude API integrated
+frontend/src/app present            → frontend implemented
+```
+
+---
+
+## Step 2: Choose tests based on state
+
+### Config/skeleton only (no backend)
 ```bash
-git checkout dev
-git pull origin dev
+npm install  # verify no install errors
 ```
+→ Done. Do not run e2e.
 
-### 2. Scan Items (in order)
-```
-1. TypeScript any type usage → replace with unknown or generics
-2. console.log usage → replace with NestJS Logger
-3. @moonward-apps/* imports → remove immediately and implement replacement
-4. ESLint warnings/errors → auto fix
-5. Missing DTO validation decorators (@IsNotEmpty etc.) → add them
-6. External API calls in Service without try-catch → add error handling
-7. Prisma N+1 queries → optimize with include
-8. Hardcoded values that should be environment variables → move to env
-```
-
-### 3. If fixes exist
+### Backend boilerplate only (no spec-extraction module)
 ```bash
-git checkout -b fix/bug-agent-YYYYMMDD
-git commit -m "fix: daily bug scan YYYYMMDD"
+cd backend && npm run build
+```
+→ If build passes → PASS. Done.
+
+### spec-extraction module exists
+Start the backend and verify core endpoints:
+```bash
+# Start server in background
+cd backend && npm run start:dev &
+SERVER_PID=$!
+sleep 8  # wait for server to be ready
+
+# Health check
+STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:3000/api/v1/health)
+if [ "$STATUS" != "200" ]; then
+  echo "FAIL: health check $STATUS"
+  kill $SERVER_PID
+  exit 1
+fi
+
+# spec/extract call (uses real Claude API)
+RESPONSE=$(curl -s -X POST http://localhost:3000/api/v1/spec/extract \
+  -H "Content-Type: application/json" \
+  -d '{"imageUrl":"https://picsum.photos/400/300"}')
+
+# Verify elements array is present
+echo $RESPONSE | grep -q '"elements"'
+if [ $? -ne 0 ]; then
+  echo "FAIL: spec/extract did not return elements"
+  kill $SERVER_PID
+  exit 1
+fi
+
+echo "PASS"
+kill $SERVER_PID
+```
+
+### Frontend exists
+In addition to backend tests above:
+```bash
+cd frontend && npm run build
+```
+
+---
+
+## Step 3: Handle results
+
+### PASS
+Do nothing. No commit. Exit.
+
+### FAIL
+1. Diagnose the root cause (read logs, error messages)
+2. If fixable:
+   - Fix the code on the current fix branch
+   - Commit and push:
+```bash
+git commit -m "fix: [one-line description of what was broken]"
 git push origin fix/bug-agent-YYYYMMDD
 ```
+3. If not fixable, record BLOCKED in `tasks/progress.md`:
+```markdown
+| week2-day2 | 2026-05-30 | ❌ BLOCKED | spec/extract returned no elements |
+```
 
-### 4. If no fixes needed
-Do nothing. Empty commits are forbidden.
+---
 
 ## Forbidden
-- No new features (bug fixes only)
-- Never push directly to main branch
-- Never change Service logic without tests
+- No linting, no `any` type scanning, no console.log scanning
+- No empty commits
+- No direct push to main branch
+- No testing features that haven't been implemented (token waste)

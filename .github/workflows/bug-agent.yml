@@ -2,7 +2,7 @@ name: Bug Agent
 
 on:
   schedule:
-    - cron: "0 5 * * 1-5" # 평일 오후 2시 KST (UTC 5시)
+    - cron: "0 4 * * *" # 매일 오후 2시 Brisbane AEST (UTC+10 = UTC 04:00)
   workflow_dispatch:
 
 jobs:
@@ -24,6 +24,11 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "20"
+
+      - name: Configure git
+        run: |
+          git config user.email "agent@snaptospec.com"
+          git config user.name "Bug Agent"
 
       - name: Install Claude Code
         run: npm install -g @anthropic-ai/claude-code
@@ -47,14 +52,13 @@ jobs:
         run: |
           claude --dangerously-skip-permissions -p "
           Read CLAUDE.md first.
-          Then read tasks/bug-agent-daily.md and execute all scan items.
-          Only commit and push if there are actual fixes. No empty commits.
+          Then read tasks/bug-agent-daily.md and follow all steps exactly.
+          All output (commit messages, comments) must be in English.
+          Only commit if there are actual fixes. No empty commits.
           " || true
 
       - name: Push if changes exist
         run: |
-          git config user.email "agent@snaptospec.com"
-          git config user.name "Bug Agent"
           if [ -n "$(git status --porcelain)" ]; then
             git push origin $BRANCH
           else
