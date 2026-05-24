@@ -4,3 +4,5 @@ dist/
 .next/
 *.log
 coverage/
+*.tsbuildinfo
+next-env.d.ts

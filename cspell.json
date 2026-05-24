@@ -2,10 +2,11 @@
   "version": "0.2",
   "language": "en",
   "ignorePaths": [
-    "node_modules/**",
-    "dist/**",
-    ".next/**",
-    "coverage/**",
+    "**/node_modules/**",
+    "**/dist/**",
+    "**/.next/**",
+    "**/coverage/**",
+    "**/build/**",
     "package-lock.json",
     "*.log"
   ],
