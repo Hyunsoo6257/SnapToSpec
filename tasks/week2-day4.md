@@ -46,11 +46,11 @@ describe('Spec Extraction E2E', () => {
       .expect({ status: 'ok' });
   });
 
-  it('POST /api/v1/spec/extract with valid imageUrl → 200 with elements', async () => {
-    // Use a publicly accessible test image URL
+  it('POST /api/v1/spec/extract with valid imageUrl → 200 with elements array', async () => {
+    // Use a publicly accessible image URL (structure test only — not checking element count)
     const response = await request(app.getHttpServer())
       .post('/api/v1/spec/extract')
-      .send({ imageUrl: 'https://via.placeholder.com/400x300.png' })
+      .send({ imageUrl: 'https://picsum.photos/400/300' })
       .expect(200);
 
     expect(response.body).toHaveProperty('elements');

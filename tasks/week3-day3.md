@@ -27,17 +27,26 @@ interface Props {
 export function SpecOverlay({ imageUrl, spec, onElementUpdate }: Props) {
   const [selectedElement, setSelectedElement] = useState<SpecElement | null>(null);
   const [editField, setEditField] = useState<string | null>(null);
+  const [imageSize, setImageSize] = useState({ width: 800, height: 600 });
 
   return (
     <div className="relative inline-block">
       {/* Original screenshot */}
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={imageUrl} alt="Screenshot" className="block max-w-full" />
+      <img
+        src={imageUrl}
+        alt="Screenshot"
+        className="block max-w-full"
+        onLoad={(e) => setImageSize({
+          width: e.currentTarget.naturalWidth,
+          height: e.currentTarget.naturalHeight,
+        })}
+      />
 
       {/* SVG overlay — same dimensions as image */}
       <svg
         className="absolute inset-0 w-full h-full"
-        viewBox={`0 0 ${getImageNaturalWidth(imageUrl)} ${getImageNaturalHeight(imageUrl)}`}
+        viewBox={`0 0 ${imageSize.width} ${imageSize.height}`}
         preserveAspectRatio="none"
       >
         {spec.elements.map((element) => (
@@ -166,12 +175,7 @@ export function ValueEditorPopover({ element, field, onSave, onClose }: Props) {
 ```
 
 ### Helper: get image dimensions
-For the SVG viewBox to match image dimensions, we need to know the image's natural dimensions. Use an `onLoad` event on the img element:
-```tsx
-// In SpecOverlay: track imageSize state
-const [imageSize, setImageSize] = useState({ width: 800, height: 600 });
-// <img onLoad={(e) => setImageSize({ width: e.currentTarget.naturalWidth, height: e.currentTarget.naturalHeight })} />
-```
+Image natural dimensions are tracked via `imageSize` state initialized to `{ width: 800, height: 600 }` and updated on the `onLoad` event of the img element (already included in the SpecOverlay code above).
 
 ### Update editor/page.tsx
 Replace the raw JSON pre-block with `<SpecOverlay>`:
