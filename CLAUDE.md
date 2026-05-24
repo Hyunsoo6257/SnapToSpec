@@ -24,7 +24,8 @@ npm run prisma:migrate:prod # Apply migrations in production
 ## Backend Architecture Rules
 
 ### Module Pattern
-- All Services must extend `GenericService` (from `packages/utils`)
+- Services that need Prisma DB access must extend `GenericService` (from `packages/utils`)
+- Exception: stateless MVP services with no DB queries (e.g. `FileService`, `SpecExtractionService`) do NOT need to extend `GenericService`
 - Guards that need DB access must also extend `GenericService`
 - Request flow: `Controller → Service → Pipe`
 - Business validation in Pipe, DB logic in Service
@@ -70,7 +71,7 @@ app.enableCors({
 app.setGlobalPrefix('api/v1')
   .useGlobalPipes(new ValidationPipe({ transform: true, forbidNonWhitelisted: true, whitelist: true }))
   .useGlobalInterceptors(new ClassSerializerInterceptor(app.get(Reflector)))
-  .useGlobalFilters(new GlobalExceptionFilter());
+  .useGlobalFilters(new GlobalExceptionFilter(app.get(HttpAdapterHost)));
 process.on('SIGTERM', async () => { await app.close(); });
 ```
 
@@ -186,4 +187,5 @@ SUPABASE_URL=                     # Supabase project URL
 SUPABASE_SERVICE_ROLE_KEY=        # Supabase service role key
 ALLOWED_CORS_ORIGIN=http://localhost:3001
 FRONTEND_BASE_URL=http://localhost:3001
+NEXT_PUBLIC_API_URL=http://localhost:3000  # Frontend → Backend URL
 ```

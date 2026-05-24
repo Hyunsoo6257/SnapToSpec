@@ -103,7 +103,12 @@ SUPABASE_URL=
 SUPABASE_SERVICE_ROLE_KEY=
 ALLOWED_CORS_ORIGIN=http://localhost:3001
 FRONTEND_BASE_URL=http://localhost:3001
+NEXT_PUBLIC_API_URL=http://localhost:3000
 ```
+
+> **Deployment note:** When deploying to Vercel, set `NEXT_PUBLIC_API_URL` to your Railway backend URL
+> (e.g. `https://your-app.railway.app`) in the Vercel dashboard → Settings → Environment Variables.
+> Also add it as a GitHub Secret `NEXT_PUBLIC_API_URL` if your CI builds the frontend.
 
 ## Completion Criteria
 - [ ] All 4 smoke test endpoints return correct responses

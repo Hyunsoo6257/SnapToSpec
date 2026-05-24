@@ -202,10 +202,19 @@ export function ValueEditorPopover({
 **Note:** The color preview div above uses inline `style` — this is an exception because the color is dynamic and cannot be expressed as a Tailwind class. This is acceptable only for dynamic values that cannot be hardcoded.
 
 ### Update SpecOverlay to use useCanvasColor hook
-- Pass `imageRef` to the `<img>` element
-- Handle image click for color picking via `handleImageClick`
-- Show cursor crosshair when `isPickingColor` is true
-- Pass `isPickingColor` and `onStartColorPick` to `ValueEditorPopover`
+
+Call `useCanvasColor()` **inside `SpecOverlay`** (not in `editor/page.tsx`):
+
+```tsx
+// At the top of SpecOverlay function body:
+const { isPickingColor, startColorPick, handleImageClick, imageRef } = useCanvasColor();
+```
+
+Then:
+- Attach `imageRef` to the `<img>` element: `<img ref={imageRef} ... />`
+- Add `onClick={handleImageClick}` to the `<img>` element
+- Add `className={isPickingColor ? 'cursor-crosshair' : ''}` to the `<img>` element
+- Pass `isPickingColor` and `onStartColorPick={startColorPick}` down to `ValueEditorPopover`
 
 ## Completion Criteria
 - [ ] Clicking a null color field (red "?") opens the ValueEditor

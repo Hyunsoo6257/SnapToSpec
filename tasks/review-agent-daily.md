@@ -15,11 +15,13 @@ git checkout dev && git pull origin dev
 
 ---
 
-## Step 2: List open branches, oldest first
+## Step 2: List open branches — fix/* first, then feat/*
 ```bash
-git branch -r | grep -E "feat/|fix/" | sort
+git branch -r | grep "fix/" | sort
+git branch -r | grep "feat/" | sort
 ```
-Process branches in chronological order (oldest date first).
+Process `fix/*` branches before `feat/*` branches (bug fixes must be merged before today's new feature).
+Within each group, process oldest date first.
 Skip branches older than 7 days — they are stale. Leave a comment and close them.
 
 ---

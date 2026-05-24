@@ -186,7 +186,14 @@ export default abstract class WinstonLogger {
 ## Update backend/src/main.ts
 Now that GlobalExceptionFilter and WinstonLogger exist, update main.ts to use them:
 - Import and use `WinstonLogger.getLogger()`
-- Import and use `new GlobalExceptionFilter()` (needs HttpAdapterHost)
+- Import `HttpAdapterHost` from `@nestjs/core` and inject it before registering the filter:
+  ```typescript
+  import { HttpAdapterHost } from '@nestjs/core';
+  // ...
+  const httpAdapterHost = app.get(HttpAdapterHost);
+  app.useGlobalFilters(new GlobalExceptionFilter(httpAdapterHost));
+  ```
+  Do NOT call `new GlobalExceptionFilter()` without the argument — the constructor requires it.
 - Import ConfigSchemaValidation and add to ConfigModule in app.module.ts
 - Import and apply `LoggerMiddleware` in AppModule
 

@@ -53,6 +53,7 @@ export function SpecOverlay({ imageUrl, spec, onElementUpdate }: Props) {
           <ElementAnnotation
             key={element.id}
             element={element}
+            imageSize={imageSize}
             onLabelClick={(field) => {
               setSelectedElement(element);
               setEditField(field);
@@ -95,10 +96,21 @@ Each element should show:
 Key styles to display: `backgroundColor`, `color`, `fontSize`, `padding`, `borderRadius`
 
 ```tsx
-function ElementAnnotation({ element, onLabelClick }: { element: SpecElement; onLabelClick: (field: string) => void }) {
+function ElementAnnotation({
+  element,
+  onLabelClick,
+  imageSize,
+}: {
+  element: SpecElement;
+  onLabelClick: (field: string) => void;
+  imageSize: { width: number; height: number };
+}) {
   const { x, y, width, height } = element.position;
 
   const keyStyles = ['backgroundColor', 'color', 'fontSize', 'padding', 'borderRadius'] as const;
+
+  // Render labels to the right if space allows, otherwise to the left
+  const labelX = x + width + 8 + 120 > imageSize.width ? x - 130 : x + width + 8;
 
   return (
     <g>
@@ -123,7 +135,7 @@ function ElementAnnotation({ element, onLabelClick }: { element: SpecElement; on
         return (
           <text
             key={field}
-            x={x + width + 8}
+            x={labelX}
             y={y + 14 + i * 14}
             fontSize={10}
             fill={isNull ? '#EF4444' : '#374151'}

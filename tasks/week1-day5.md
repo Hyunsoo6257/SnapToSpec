@@ -131,11 +131,14 @@ export class FileService {
 
 #### file.controller.ts
 ```typescript
-import { Controller, Post, UploadedFile, UseInterceptors } from '@nestjs/common';
+import { BadRequestException, Controller, Post, UploadedFile, UseInterceptors } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiConsumes, ApiTags } from '@nestjs/swagger';
+import { memoryStorage } from 'multer';
 import { FileService } from './file.service';
 import { UploadResultDto } from './dto/upload-result.dto';
+
+const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
 @ApiTags('File')
 @Controller('file')
@@ -144,7 +147,14 @@ export class FileController {
 
   @Post('upload')
   @ApiConsumes('multipart/form-data')
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(FileInterceptor('file', {
+    storage: memoryStorage(),
+    limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
+    fileFilter: (_req, file, cb) => {
+      if (ALLOWED_MIME_TYPES.includes(file.mimetype)) cb(null, true);
+      else cb(new BadRequestException('Only JPEG, PNG, and WebP images are allowed'), false);
+    },
+  }))
   uploadScreenshot(@UploadedFile() file: Express.Multer.File): Promise<UploadResultDto> {
     return this.fileService.uploadScreenshot(file);
   }

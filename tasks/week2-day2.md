@@ -107,7 +107,11 @@ Rules:
 
       let parsed: unknown;
       try {
-        parsed = JSON.parse(content.text);
+        let rawText = content.text.trim();
+        if (rawText.startsWith('```')) {
+          rawText = rawText.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '').trim();
+        }
+        parsed = JSON.parse(rawText);
       } catch {
         this.logger.error(`Claude returned non-JSON: ${content.text.slice(0, 200)}`);
         throw new InternalServerErrorException('Claude returned invalid JSON');

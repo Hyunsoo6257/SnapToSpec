@@ -58,7 +58,7 @@ backend/
   "scripts": {
     "start:dev": "nest start --watch",
     "build": "nest build",
-    "test": "jest"
+    "test": "jest --passWithNoTests"
   }
 }
 ```
@@ -114,7 +114,7 @@ frontend/
   "scripts": {
     "start:dev": "next dev -p 3001",
     "build": "next build",
-    "test": "jest"
+    "test": "jest --passWithNoTests"
   },
   "dependencies": {
     "next": "14.x",

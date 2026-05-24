@@ -6,7 +6,7 @@ on:
 jobs:
   feature-agent:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     permissions:
       contents: write
       pull-requests: write

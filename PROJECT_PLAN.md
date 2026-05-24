@@ -283,6 +283,19 @@ Each PR description includes a summary of what was implemented.
 
 ---
 
+## 9. Deployment Notes (manual steps — not automated)
+
+### Railway (Backend)
+- Set health check path to `/api/v1/health` in Railway dashboard → Settings → Health Check Path
+- Run `npm run prisma:generate` before `npm run build` in Railway's build command (Prisma client must be generated first)
+  - Build command: `npm run prisma:generate && npm run build`
+
+### Vercel (Frontend)
+- Add environment variable `NEXT_PUBLIC_API_URL` = your Railway backend URL (e.g. `https://your-app.railway.app`) in Vercel dashboard → Settings → Environment Variables
+- Also add `NEXT_PUBLIC_API_URL` as a GitHub Secret if CI builds the frontend
+
+---
+
 ## 9. Tech Stack
 
 | Layer | Current | After AWS Migration |
