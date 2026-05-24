@@ -1,8 +1,6 @@
 name: Feature Agent
 
 on:
-  schedule:
-    - cron: "0 23 * * *" # 매일 오전 9시 Brisbane AEST (UTC+10 = UTC 전날 23:00)
   workflow_dispatch:
 
 jobs:
@@ -41,19 +39,29 @@ jobs:
             echo "BLOCKED=false" >> $GITHUB_ENV
           fi
 
-      - name: Install Claude Code
+      - name: Check if branch already exists
         if: env.BLOCKED == 'false'
+        run: |
+          BRANCH="feat/agent-$(TZ='Australia/Brisbane' date +%Y%m%d)"
+          if git ls-remote --exit-code --heads origin $BRANCH 2>/dev/null; then
+            echo "BRANCH_EXISTS=true" >> $GITHUB_ENV
+            echo "::warning::Branch $BRANCH already exists — skipping to prevent duplicate run"
+          else
+            echo "BRANCH_EXISTS=false" >> $GITHUB_ENV
+          fi
+          echo "BRANCH=$BRANCH" >> $GITHUB_ENV
+
+      - name: Install Claude Code
+        if: env.BLOCKED == 'false' && env.BRANCH_EXISTS == 'false'
         run: npm install -g @anthropic-ai/claude-code
 
       - name: Create feature branch
-        if: env.BLOCKED == 'false'
+        if: env.BLOCKED == 'false' && env.BRANCH_EXISTS == 'false'
         run: |
-          BRANCH="feat/agent-$(date +%Y%m%d)"
           git checkout -b $BRANCH
-          echo "BRANCH=$BRANCH" >> $GITHUB_ENV
 
       - name: Run Feature Agent
-        if: env.BLOCKED == 'false'
+        if: env.BLOCKED == 'false' && env.BRANCH_EXISTS == 'false'
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
@@ -88,7 +96,7 @@ jobs:
           " || true
 
       - name: Push branch
-        if: env.BLOCKED == 'false'
+        if: env.BLOCKED == 'false' && env.BRANCH_EXISTS == 'false'
         run: |
           if git log origin/dev..$BRANCH 2>/dev/null | grep -q .; then
             git push origin $BRANCH

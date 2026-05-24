@@ -1,8 +1,6 @@
 name: Review Agent
 
 on:
-  schedule:
-    - cron: "0 8 * * *" # 매일 오후 6시 Brisbane AEST (UTC+10 = UTC 08:00)
   workflow_dispatch:
 
 jobs:
@@ -43,5 +41,6 @@ jobs:
           Check all open feat/* and fix/* branches.
           Review each branch against the checklist in review-agent-daily.md.
           For each passing branch: merge into dev AND create a PR with a clear summary of what was implemented.
+          All output (commit messages, PR titles, PR descriptions, comments) must be in English.
           If today (Brisbane AEST) is Sunday: create a PR from dev to main as a weekly release.
           " || true

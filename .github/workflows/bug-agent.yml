@@ -1,8 +1,6 @@
 name: Bug Agent
 
 on:
-  schedule:
-    - cron: "0 4 * * *" # 매일 오후 2시 Brisbane AEST (UTC+10 = UTC 04:00)
   workflow_dispatch:
 
 jobs:
@@ -13,12 +11,24 @@ jobs:
       pull-requests: write
 
     steps:
-      - name: Checkout dev branch
+      - name: Checkout today's feat branch
         uses: actions/checkout@v4
         with:
-          ref: dev
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Resolve today's feat branch
+        run: |
+          FEAT_BRANCH="feat/agent-$(TZ='Australia/Brisbane' date +%Y%m%d)"
+          if git ls-remote --exit-code --heads origin $FEAT_BRANCH 2>/dev/null; then
+            echo "TARGET_BRANCH=$FEAT_BRANCH" >> $GITHUB_ENV
+            git checkout $FEAT_BRANCH
+            echo "Testing feat branch: $FEAT_BRANCH"
+          else
+            echo "TARGET_BRANCH=dev" >> $GITHUB_ENV
+            git checkout dev
+            echo "No feat branch for today — falling back to dev"
+          fi
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -35,9 +45,9 @@ jobs:
 
       - name: Create fix branch
         run: |
-          BRANCH="fix/bug-agent-$(date +%Y%m%d)"
-          git checkout -b $BRANCH
-          echo "BRANCH=$BRANCH" >> $GITHUB_ENV
+          FIX_BRANCH="fix/bug-agent-$(TZ='Australia/Brisbane' date +%Y%m%d)"
+          git checkout -b $FIX_BRANCH
+          echo "FIX_BRANCH=$FIX_BRANCH" >> $GITHUB_ENV
 
       - name: Run Bug Agent
         env:
@@ -59,8 +69,8 @@ jobs:
 
       - name: Push if changes exist
         run: |
-          if [ -n "$(git status --porcelain)" ]; then
-            git push origin $BRANCH
+          if git log origin/$TARGET_BRANCH..$FIX_BRANCH 2>/dev/null | grep -q .; then
+            git push origin $FIX_BRANCH
           else
-            echo "No changes found, skipping push"
+            echo "No fixes made, skipping push"
           fi
