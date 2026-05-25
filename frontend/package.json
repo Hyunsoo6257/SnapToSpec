@@ -1,0 +1,27 @@
+{
+  "name": "@snaptospec/frontend",
+  "version": "0.1.0",
+  "private": true,
+  "description": "SnapToSpec frontend — Next.js App Router",
+  "scripts": {
+    "start:dev": "next dev -p 3001",
+    "start": "next start -p 3001",
+    "build": "NODE_ENV=production next build",
+    "lint": "next lint",
+    "test": "jest --passWithNoTests"
+  },
+  "dependencies": {
+    "next": "14.2.15",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/react": "^18.3.0",
+    "@types/react-dom": "^18.3.0",
+    "autoprefixer": "^10.4.0",
+    "postcss": "^8.4.0",
+    "tailwindcss": "^3.4.0",
+    "typescript": "^5.0.0"
+  }
+}
