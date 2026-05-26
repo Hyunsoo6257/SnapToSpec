@@ -1,16 +1,21 @@
 import { ClassSerializerInterceptor, ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { NestFactory, Reflector } from '@nestjs/core';
+import { HttpAdapterHost, NestFactory, Reflector } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
+import { ApiConfigService } from '@snaptospec/utils';
 
 import { AppModule } from './app.module';
-import { setupOpenApi } from './open-api';
+import { OpenApi } from './open-api';
+import { GlobalExceptionFilter } from './shared/filter/global-exception.filter';
+import WinstonLogger from './winston-logger';
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     rawBody: true,
+    logger: WinstonLogger.getLogger(),
   });
   const configService = app.get(ConfigService);
+  const apiConfigService = app.get(ApiConfigService);
 
   app.enableCors({
     origin: configService.getOrThrow<string>('ALLOWED_CORS_ORIGIN').split(','),
@@ -28,13 +33,12 @@ async function bootstrap(): Promise<void> {
         whitelist: true,
       }),
     )
-    .useGlobalInterceptors(new ClassSerializerInterceptor(app.get(Reflector)));
-  // TODO(week1-day4): wire GlobalExceptionFilter once it is implemented.
+    .useGlobalInterceptors(new ClassSerializerInterceptor(app.get(Reflector)))
+    .useGlobalFilters(new GlobalExceptionFilter(app.get(HttpAdapterHost)));
 
-  setupOpenApi(app, configService);
+  new OpenApi(apiConfigService).handler(app);
 
-  const port = Number(configService.get('APPLICATION_PORT') ?? 3000);
-  await app.listen(port);
+  await app.listen(apiConfigService.applicationPort);
 
   process.on('SIGTERM', async () => {
     await app.close();
