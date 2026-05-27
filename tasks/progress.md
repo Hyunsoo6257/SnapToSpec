@@ -13,7 +13,7 @@ Bug Agent가 FAIL 감지 시 ❌ BLOCKED로 업데이트한다.
 | week1-day1 | 2026-05-24 | ✅ MERGED | — |
 | week1-day2 | 2026-05-25 | ✅ MERGED | — |
 | week1-day3 | 2026-05-26 | ✅ MERGED | — |
-| week1-day4 | 2026-05-27 | 👀 IN REVIEW | — |
+| week1-day4 | 2026-05-27 | ✅ MERGED | — |
 | week1-day5 | — | ⏳ PENDING | — |
 | week2-day1 | — | ⏳ PENDING | — |
 | week2-day2 | — | ⏳ PENDING | — |
