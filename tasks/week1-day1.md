@@ -1,88 +1,96 @@
-# Week 1 Day 1 — Monorepo Initialization
-
-## Context
-- Project name: SnapToSpec
-- Reference code: vaulcan-backend, pocket-appraisal-nz-backend (follow patterns only)
-- Must follow all rules in CLAUDE.md
+# Week 1 Day 1 — Monorepo Root Setup
 
 ## Goal
-Initialize the snaptospec/ root monorepo.
-Goal is a working skeleton only. No business logic.
+Initialize the monorepo root config files. No application code — skeleton only.
 
-## Completion Criteria (all must be met)
-- [ ] `npm install` runs without errors from root
-- [ ] `npm run lint` runs without errors
-- [ ] All files listed below exist
+## Context
+- Project: SnapToSpec (see CLAUDE.md and PROJECT_PLAN.md)
+- Nothing exists except CLAUDE.md, PROJECT_PLAN.md, .github/, tasks/
+- Follow all CLAUDE.md rules strictly
 
 ## Files to Create
 
-### Root
+### Root files
 ```
-package.json         # lerna workspace config
-lerna.json           # packages: ["frontend", "backend", "packages/*"]
-tsconfig.json        # base tsconfig
-.prettierrc          # { "singleQuote": true, "trailingComma": "all" }
-.commitlintrc.json   # conventional commits
-eslint.config.mjs    # same rules as vaulcan-backend
-.gitignore
-.env.example         # refer to CLAUDE.md environment variables section
-```
-
-### backend/
-```
-package.json         # NestJS 11 dependencies (moonward packages strictly forbidden)
-nest-cli.json
-tsconfig.json
-tsconfig.build.json
-src/
-  main.ts            # empty bootstrap function only
-  app.module.ts      # empty AppModule only
-  app.controller.ts
-  app.service.ts
+package.json          # Lerna workspace with npm workspaces
+lerna.json            # packages: ["frontend", "backend", "packages/*"]
+tsconfig.json         # base TypeScript config (strict mode, emitDecoratorMetadata: true)
+.prettierrc           # { "singleQuote": true, "trailingComma": "all" }
+.commitlintrc.json    # conventional commits config
+eslint.config.mjs     # TypeScript ESLint flat config
+.env.example          # all env vars from CLAUDE.md (empty values, with comments)
 ```
 
-### frontend/
-```
-package.json         # Next.js 14
-next.config.ts
-tsconfig.json
-tailwind.config.ts
-src/app/
-  layout.tsx
-  page.tsx           # "Hello SnapToSpec" text only
+Update `.gitignore` (currently only has `.env`) to also include:
+`node_modules/`, `dist/`, `.next/`, `*.log`, `coverage/`
+
+### package.json scripts (root)
+```json
+{
+  "private": true,
+  "workspaces": ["frontend", "backend", "packages/*"],
+  "scripts": {
+    "start:dev": "lerna run start:dev --parallel",
+    "build": "lerna run build",
+    "test": "lerna run test",
+    "lint": "eslint . && cspell \"**/*.{ts,tsx,md}\"",
+    "prisma:generate": "lerna run prisma:generate --scope=@snaptospec/prisma",
+    "prisma:migrate:dev": "lerna run prisma:migrate:dev --scope=@snaptospec/prisma",
+    "prisma:migrate:prod": "lerna run prisma:migrate:prod --scope=@snaptospec/prisma"
+  }
+}
 ```
 
-### packages/prisma/
-```
-package.json
-prisma/
-  schema.prisma      # use schema from PROJECT_PLAN.md exactly
-src/
-  index.ts           # PrismaProvider (follow pocket-appraisal pattern)
+### tsconfig.json (base config)
+```json
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "commonjs",
+    "lib": ["ES2020"],
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "declaration": true,
+    "removeComments": true,
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators": true
+  }
+}
 ```
 
-### packages/utils/
+### eslint.config.mjs
+TypeScript ESLint flat config with these rules:
+- `@typescript-eslint/no-explicit-any`: "error"
+- `no-console`: "error"
+- `@typescript-eslint/no-unused-vars`: ["error", { "ignoreRestSiblings": true }]
+- Prettier integration (`eslint-config-prettier`)
+- Applies to `**/*.{ts,tsx}` files
+
+### lerna.json
+```json
+{
+  "$schema": "node_modules/lerna/schemas/lerna-schema.json",
+  "version": "independent",
+  "npmClient": "npm",
+  "packages": ["frontend", "backend", "packages/*"]
+}
 ```
-package.json
-src/
-  config/
-    api-config.service.ts   # follow pocket-appraisal pattern
-  index.ts
-```
 
-## Reference Files
-- pocket-appraisal-nz-backend/packages/utils/src/ (ApiConfigService pattern)
-- pocket-appraisal-nz-backend/lerna.json
-- vaulcan-backend/eslint.config.mjs
-- vaulcan-backend/tsconfig.json
-
-## Forbidden
-- Never use @moonward-apps/* packages
-- No business logic (skeleton only)
-- Never push directly to main branch
-
-## Branch
-feat/week1-day1-monorepo-init
+## Completion Criteria
+- [ ] `npm install` runs without errors from root
+- [ ] `npm run lint` runs without errors (no TS source files yet, config only)
+- [ ] All listed root files exist
 
 ## Commit Message
-feat: init monorepo structure
+```
+chore: init monorepo root config
+```
+
+## Forbidden
+- No application source code in this task (root config only)
+- Never use `@moonward-apps/*` packages
+- Never push directly to main branch
+- No business logic

@@ -1,22 +1,21 @@
 name: Feature Agent
 
 on:
-  schedule:
-    - cron: "0 0 * * 1-5" # 평일 오전 9시 KST (UTC 0시)
   workflow_dispatch:
 
 jobs:
   feature-agent:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     permissions:
       contents: write
       pull-requests: write
 
     steps:
-      - name: Checkout dev branch
+      - name: Checkout main branch
         uses: actions/checkout@v4
         with:
-          ref: dev
+          ref: main
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -25,16 +24,44 @@ jobs:
         with:
           node-version: "20"
 
+      - name: Configure git
+        run: |
+          git config user.email "agent@snaptospec.com"
+          git config user.name "Feature Agent"
+
+      - name: Check for BLOCKED status
+        id: check_blocked
+        run: |
+          if grep -qE "^\|.*❌ BLOCKED" tasks/progress.md 2>/dev/null; then
+            echo "BLOCKED=true" >> $GITHUB_ENV
+            echo "::warning::BLOCKED status found in progress.md — skipping today's task"
+          else
+            echo "BLOCKED=false" >> $GITHUB_ENV
+          fi
+
+      - name: Check if branch already exists
+        if: env.BLOCKED == 'false'
+        run: |
+          BRANCH="feat/agent-$(TZ='Australia/Brisbane' date +%Y%m%d)"
+          if git ls-remote --exit-code --heads origin $BRANCH 2>/dev/null; then
+            echo "BRANCH_EXISTS=true" >> $GITHUB_ENV
+            echo "::warning::Branch $BRANCH already exists — skipping to prevent duplicate run"
+          else
+            echo "BRANCH_EXISTS=false" >> $GITHUB_ENV
+          fi
+          echo "BRANCH=$BRANCH" >> $GITHUB_ENV
+
       - name: Install Claude Code
+        if: env.BLOCKED == 'false' && env.BRANCH_EXISTS == 'false'
         run: npm install -g @anthropic-ai/claude-code
 
       - name: Create feature branch
+        if: env.BLOCKED == 'false' && env.BRANCH_EXISTS == 'false'
         run: |
-          BRANCH="feat/agent-$(date +%Y%m%d)"
           git checkout -b $BRANCH
-          echo "BRANCH=$BRANCH" >> $GITHUB_ENV
 
       - name: Run Feature Agent
+        if: env.BLOCKED == 'false' && env.BRANCH_EXISTS == 'false'
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
@@ -45,15 +72,40 @@ jobs:
           ALLOWED_CORS_ORIGIN: ${{ secrets.ALLOWED_CORS_ORIGIN }}
           FRONTEND_BASE_URL: ${{ secrets.FRONTEND_BASE_URL }}
         run: |
-          claude --dangerously-skip-permissions -p "
+          TODAY=$(TZ="Australia/Brisbane" date +%Y-%m-%d)
+          claude --dangerously-skip-permissions --max-turns 100 -p "
           Read CLAUDE.md and PROJECT_PLAN.md first.
-          Then read the current task file in tasks/ folder for today.
+          Read tasks/progress.md to understand current state.
+
+          STEP 1 — Check for pending catch-up tasks:
+          Look at tasks/progress.md for any row where the task name starts with 'catchup-' and status is PENDING.
+          If one exists, run that task file (e.g. tasks/catchup-1.md) instead of the date-based schedule below.
+          Mark that catchup task as IN PROGRESS when starting, IN REVIEW when done.
+
+          STEP 2 — If no pending catch-up tasks, use date-based schedule:
+          Today is $TODAY (Brisbane AEST).
+          Task schedule:
+            Week 1: 2026-05-24=day1, 2026-05-25=day2, 2026-05-26=day3, 2026-05-27=day4, 2026-05-28=day5
+            Week 2: 2026-05-29=day1, 2026-05-30=day2, 2026-05-31=day3, 2026-06-01=day4, 2026-06-02=day5
+            Week 3: 2026-06-03=day1, 2026-06-04=day2, 2026-06-05=day3, 2026-06-06=day4, 2026-06-07=day5
+
+          Find today's week and day number from the schedule above.
+          Read the corresponding task file (e.g. tasks/week2-day3.md).
           Execute the task completely following all rules in CLAUDE.md.
-          Commit with the branch name and push when done.
-          " || true
+
+          When starting: update tasks/progress.md — mark today's task as 🔄 IN PROGRESS.
+          When done: update tasks/progress.md — mark today's task as 👀 IN REVIEW with today's date.
+
+          Commit all changes (including progress.md update) with the message specified in the task file.
+          All output (commit messages, comments) must be in English.
+          Do NOT push — the workflow will push for you.
+          "
 
       - name: Push branch
+        if: env.BLOCKED == 'false' && env.BRANCH_EXISTS == 'false'
         run: |
-          git config user.email "agent@snaptospec.com"
-          git config user.name "Feature Agent"
-          git push origin $BRANCH || true
+          if git log origin/main..$BRANCH 2>/dev/null | grep -q .; then
+            git push origin $BRANCH
+          else
+            echo "No new commits on $BRANCH, skipping push"
+          fi

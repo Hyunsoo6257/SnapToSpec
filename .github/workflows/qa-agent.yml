@@ -1,22 +1,21 @@
-name: Bug Agent
+name: QA Agent
 
 on:
-  schedule:
-    - cron: "0 5 * * 1-5" # 평일 오후 2시 KST (UTC 5시)
   workflow_dispatch:
 
 jobs:
-  bug-agent:
+  qa-agent:
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     permissions:
       contents: write
       pull-requests: write
 
     steps:
-      - name: Checkout dev branch
+      - name: Checkout main branch
         uses: actions/checkout@v4
         with:
-          ref: dev
+          ref: main
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -25,18 +24,18 @@ jobs:
         with:
           node-version: "20"
 
+      - name: Configure git
+        run: |
+          git config user.email "agent@snaptospec.com"
+          git config user.name "QA Agent"
+
       - name: Install Claude Code
         run: npm install -g @anthropic-ai/claude-code
 
-      - name: Create fix branch
-        run: |
-          BRANCH="fix/bug-agent-$(date +%Y%m%d)"
-          git checkout -b $BRANCH
-          echo "BRANCH=$BRANCH" >> $GITHUB_ENV
-
-      - name: Run Bug Agent
+      - name: Run QA Agent
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
@@ -45,18 +44,8 @@ jobs:
           ALLOWED_CORS_ORIGIN: ${{ secrets.ALLOWED_CORS_ORIGIN }}
           FRONTEND_BASE_URL: ${{ secrets.FRONTEND_BASE_URL }}
         run: |
-          claude --dangerously-skip-permissions -p "
+          claude --dangerously-skip-permissions --max-turns 120 -p "
           Read CLAUDE.md first.
-          Then read tasks/bug-agent-daily.md and execute all scan items.
-          Only commit and push if there are actual fixes. No empty commits.
-          " || true
-
-      - name: Push if changes exist
-        run: |
-          git config user.email "agent@snaptospec.com"
-          git config user.name "Bug Agent"
-          if [ -n "$(git status --porcelain)" ]; then
-            git push origin $BRANCH
-          else
-            echo "No changes found, skipping push"
-          fi
+          Then read tasks/qa-agent.md and follow all steps exactly.
+          All output (commit messages, PR titles, PR descriptions) must be in English.
+          "

@@ -1,8 +1,20 @@
-# SnapToSpec — Full Project Plan
+# SnapToSpec — Project Plan
 
 ## Overview
-A tool that converts design screenshots into accurate UI spec JSON.
-Improves the quality of input passed to Claude Code to eliminate px/color errors.
+A tool that converts design screenshots into spec overlay images for accurate UI development.
+
+**Problem:** AI (Claude) makes px/color mistakes when reading design files. Correcting each one manually is tedious.
+
+**Solution:**
+1. Upload screenshot → backend stores in Supabase Storage → returns imageUrl
+2. Claude Vision API analyzes imageUrl → returns JSON spec (internal only, not shown to user)
+3. Frontend renders Canvas/SVG overlay: bounding boxes + element IDs + CSS values + null highlights
+4. User clicks values to correct them; Canvas API samples colors from original image for null colors
+5. Click "Copy Image" (Canvas.toBlob → clipboard) or "Download" → paste into claude.ai
+
+**Architecture:** Stateless. No database in MVP. Browser state only.
+
+**Target users:** Designers doing UI development with Claude (non-developers using claude.ai web)
 
 ---
 
@@ -23,7 +35,6 @@ snaptospec/
 ├── .gitignore
 │
 ├── frontend/                          # Next.js 14 (App Router)
-│   ├── CLAUDE.md
 │   ├── package.json
 │   ├── next.config.ts
 │   ├── tsconfig.json
@@ -32,298 +43,158 @@ snaptospec/
 │       ├── app/
 │       │   ├── layout.tsx
 │       │   ├── page.tsx               # Landing (screenshot upload)
-│       │   ├── editor/
-│       │   │   └── page.tsx           # Spec editor (core screen)
-│       │   └── result/
-│       │       └── page.tsx           # Final spec JSON + export
+│       │   └── editor/
+│       │       └── page.tsx           # Spec editor (overlay + edit)
 │       ├── components/
 │       │   ├── upload/
-│       │   │   └── ScreenshotUploader.tsx
-│       │   ├── editor/
-│       │   │   ├── AnnotationCanvas.tsx   # Screenshot overlay
-│       │   │   ├── SpecPanel.tsx          # Right-side spec edit panel
-│       │   │   └── ElementCard.tsx        # Per-element card
-│       │   └── ui/
+│       │   │   └── ScreenshotUploader.tsx   # drag & drop upload
+│       │   └── editor/
+│       │       ├── SpecOverlay.tsx    # Canvas/SVG overlay (bounding boxes + labels)
+│       │       └── ValueEditor.tsx    # Click-to-edit popover
 │       ├── hooks/
-│       │   ├── useCanvasColor.ts      # Canvas API color extraction
-│       │   └── useSpecExtraction.ts   # Claude API call
+│       │   ├── useCanvasColor.ts      # Canvas API: sample color from original image
+│       │   └── useSpecExtraction.ts   # API call hook
 │       ├── lib/
-│       │   ├── api.ts
-│       │   └── canvas.ts
+│       │   ├── api.ts                 # Backend API client
+│       │   └── canvas.ts              # Canvas export (toBlob for copy/download)
 │       └── types/
-│           └── spec.ts
+│           └── spec.ts                # SpecElement, SpecStyles types
 │
-├── backend/                           # NestJS 11
-│   ├── CLAUDE.md
+├── backend/                           # NestJS 11 (stateless)
 │   ├── package.json
 │   ├── nest-cli.json
 │   ├── tsconfig.json
+│   ├── tsconfig.build.json
 │   └── src/
-│       ├── main.ts
+│       ├── main.ts                    # global setup (see CLAUDE.md)
 │       ├── app.module.ts
-│       ├── app.controller.ts
-│       ├── app.service.ts
-│       ├── open-api.ts
+│       ├── open-api.ts                # Swagger (non-prod only)
 │       ├── winston-logger.ts
 │       ├── shared/
-│       │   ├── generic-service/
-│       │   │   └── index.ts           # GenericService (Prisma injection)
 │       │   ├── config-schema-validation/
 │       │   │   └── index.ts           # Joi env validation
-│       │   ├── exception-handler/
-│       │   │   └── prisma-exception-handler/
-│       │   ├── decorator/
-│       │   │   ├── get-user.decorator.ts
-│       │   │   └── exception-response.decorator.ts
+│       │   ├── filter/
+│       │   │   └── global-exception.filter.ts
 │       │   ├── middleware/
-│       │   │   └── logger.middleware.ts   # moonward replacement
-│       │   ├── pipes/
-│       │   │   └── check-exist.pipe.ts
-│       │   └── dto/
-│       │       └── error-response/
+│       │   │   └── logger.middleware.ts
+│       │   └── decorator/
+│       │       └── exception-response.decorator.ts
 │       └── module/
 │           ├── health-check/
-│           ├── spec-extraction/       # Core — Claude API call
-│           │   ├── spec-extraction.module.ts
-│           │   ├── spec-extraction.controller.ts
-│           │   ├── spec-extraction.service.ts
-│           │   └── dto/
-│           │       ├── extract-request.dto.ts
-│           │       └── extract-result.dto.ts
-│           ├── spec-session/          # Session save/edit
-│           │   ├── spec-session.module.ts
-│           │   ├── spec-session.controller.ts
-│           │   ├── spec-session.service.ts
-│           │   └── dto/
-│           ├── file/                  # Image upload (Supabase Storage → S3 later)
+│           │   ├── health-check.module.ts
+│           │   └── health-check.controller.ts   # GET /health → { status: 'ok' }
+│           ├── file/                  # Image upload → Supabase Storage
 │           │   ├── file.module.ts
-│           │   ├── file.controller.ts
-│           │   └── file.service.ts    # Abstracted via IStorageService interface
-│           └── code-export/           # Spec JSON → Claude Code prompt
-│               ├── code-export.module.ts
-│               ├── code-export.service.ts
+│           │   ├── file.controller.ts  # POST /file/upload → { imageUrl }
+│           │   ├── file.service.ts
+│           │   └── storage/
+│           │       ├── storage.interface.ts    # IStorageService
+│           │       └── supabase-storage.service.ts
+│           └── spec-extraction/       # Claude API → JSON spec
+│               ├── spec-extraction.module.ts
+│               ├── spec-extraction.controller.ts  # POST /spec/extract
+│               ├── spec-extraction.service.ts
 │               └── dto/
+│                   ├── base.dto.ts
+│                   ├── extract-request.dto.ts    # { imageUrl: string }
+│                   └── extract-result.dto.ts     # { elements: SpecElement[] }
 │
 └── packages/
-    ├── prisma/                        # Prisma (PostgreSQL / Supabase)
+    ├── prisma/                        # Prisma setup (future use, not used in MVP)
     │   ├── package.json
     │   ├── prisma/
-    │   │   ├── schema.prisma
-    │   │   └── migrations/
+    │   │   └── schema.prisma          # empty schema (datasource + generator only)
     │   └── src/
-    │       └── index.ts               # PrismaProvider
+    │       ├── index.ts
+    │       ├── prisma-provider.ts     # singleton
+    │       └── prisma-connection.ts   # extends PrismaClient, query logging in dev
     └── utils/
         ├── package.json
         └── src/
             ├── config/
-            │   └── api-config.service.ts
+            │   └── api-config.service.ts   # isDevelopment, applicationPort, etc.
+            ├── dto/
+            │   └── generic-assign.dto.ts   # abstract class GenericAssignDto<T>
+            ├── generic-service/
+            │   └── index.ts               # abstract GenericService (Prisma access)
             └── index.ts
 ```
 
 ---
 
-## 2. Prisma Schema
+## 2. Spec JSON Structure (returned by /spec/extract)
 
-```prisma
-generator client {
-  provider = "prisma-client-js"
+```typescript
+// types/spec.ts (shared between frontend and backend)
+interface SpecElement {
+  id: string;           // e.g. "btn-primary", "text-heading"
+  type: 'button' | 'text' | 'input' | 'image' | 'card' | 'container' | 'icon' | 'divider';
+  label: string | null; // visible text
+  position: { x: number; y: number; width: number; height: number }; // px from top-left
+  styles: {
+    backgroundColor: string | null;  // #HEX or 'transparent' or null
+    color: string | null;            // #HEX or null
+    fontSize: string | null;         // "16px" or null
+    fontWeight: string | null;       // "400"|"500"|"600"|"700" or null
+    borderRadius: string | null;     // "8px" or null
+    padding: string | null;          // "12px 24px 12px 24px" or null
+    margin: string | null;           // "0px 0px 16px 0px" or null
+    border: string | null;           // "1px solid #E5E7EB" or "none" or null
+    gap: string | null;              // "8px" or null
+  };
 }
 
-datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
-}
-
-model SpecSession {
-  id              String        @id @default(cuid())
-  screenshotUrl   String
-  rawSpec         Json          // Original spec extracted by Claude
-  editedSpec      Json?         // Human-edited version
-  exportedPrompt  String?       // Final prompt to pass to Claude Code
-  status          SessionStatus @default(EXTRACTING)
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
-}
-
-enum SessionStatus {
-  EXTRACTING
-  REVIEWING
-  EXPORTED
+interface SpecResult {
+  elements: SpecElement[];
 }
 ```
 
 ---
 
-## 3. AWS Migration Strategy
-
-Designed with interfaces so Supabase → AWS migration requires minimal code changes.
+## 3. Storage Interface (AWS Migration Ready)
 
 ```typescript
-// shared/storage/storage.interface.ts
 export interface IStorageService {
-  upload(file: Buffer, key: string): Promise<string>;
+  upload(file: Buffer, key: string, mimeType: string): Promise<string>;
   getSignedUrl(key: string): Promise<string>;
   delete(key: string): Promise<void>;
 }
-
-// Now: SupabaseStorageService implements IStorageService
-// Later: S3StorageService implements IStorageService
-// → Only swap the provider in file.module.ts
+// Supabase bucket: "screenshots"
+// Now: SupabaseStorageService
+// Later: S3StorageService (swap in file.module.ts only)
 ```
 
 ---
 
-## 4. Agent Task Plan (4-week prototype)
-
-### Checkpoint Criteria (human must verify)
-
-```
-End of Week 1 → npm run start:dev works + Supabase connected + /api/v1/health responds
-End of Week 2 → Screenshot upload → Claude API → JSON returned (CORE: do not proceed to Week 3 if this fails)
-End of Week 3 → Spec overlay displayed in browser + Canvas color extraction works
-End of Week 4 → Full flow works end-to-end (upload → spec → edit → export)
-```
-
----
-
-### Feature Agent Tasks (runs at 9am KST weekdays)
-
-#### Week 1 — Project Foundation
-```
-Day 1: Monorepo init (lerna, tsconfig, eslint, prettier, commitlint)
-Day 2: GitHub Actions setup (3 workflow files + dev branch creation)
-Day 3: NestJS backend boilerplate (main.ts, app.module, GlobalPipe, CORS, Swagger)
-Day 4: packages/prisma setup (schema.prisma, PrismaProvider, Supabase connection)
-Day 5: packages/utils ApiConfigService + Joi ConfigSchemaValidation + shared/ (GenericService, LoggerMiddleware, PrismaExceptionHandler)
-```
-
-#### Week 2 — File Upload + Core Spec Extraction
-```
-Day 1: IStorageService interface + SupabaseStorageService implementation
-Day 2: file module (image upload endpoint)
-Day 3: spec-extraction module skeleton (Controller, Service, DTO)
-Day 4: Claude API integration (image → spec JSON extraction)
-       ⚠️ Prompt requires human tuning — agent writes draft, human reviews
-Day 5: spec-session module (session CRUD) + unit tests
-```
-
-#### Week 3 — Frontend
-```
-Day 1: Next.js init (App Router, Tailwind, folder structure)
-Day 2: ScreenshotUploader component + API client (lib/api.ts)
-Day 3: Upload → backend E2E connection
-Day 4: AnnotationCanvas base (image rendering + Canvas API color extraction)
-Day 5: Spec overlay display (visualize Claude extraction results)
-```
-
-#### Week 4 — Editor Complete + Export (Prototype Done)
-```
-Day 1: SpecPanel right-side edit panel + ElementCard
-Day 2: Click-to-edit interface for element values
-Day 3: code-export module (spec JSON → Claude Code prompt)
-Day 4: Result page (display final prompt + copy button)
-Day 5: Full flow E2E test + bug fixes
-```
-
----
-
-### Bug Agent Tasks (runs at 2pm KST weekdays)
-```
-Daily checklist:
-- Scan for TypeScript any type usage
-- Fix ESLint warnings
-- Detect missing error handling
-- Remove unused imports/variables
-- Detect Prisma N+1 queries
-- Check for missing DTO validation
-- Check for unvalidated environment variables
-- Check for console.log usage
-- Check for moonward package imports
-```
-
-### Review Agent Tasks (runs at 6pm KST weekdays)
-```
-Daily checklist:
-- Verify CLAUDE.md rule compliance
-- Auto-create PRs for feat/* and fix/* branches
-- Verify tests pass
-- Merge passing branches into dev
-- Every Friday: create dev → main PR (human merges manually)
-```
-
----
-
-## 5. GitHub Actions Schedule
-
-```yaml
-# feature-agent.yml
-schedule: '0 0 * * 1-5'   # 9am KST weekdays (UTC 0)
-
-# bug-agent.yml
-schedule: '0 5 * * 1-5'   # 2pm KST weekdays (UTC 5)
-
-# review-agent.yml
-schedule: '0 9 * * 1-5'   # 6pm KST weekdays (UTC 9)
-```
-
----
-
-## 6. Branch Strategy
-
-```
-main    → production (human merges manually, weekly)
-dev     → always latest (Review Agent merges daily)
-feat/*  → Feature Agent work
-fix/*   → Bug Agent work
-```
-
----
-
-## 7. Tech Stack
-
-| Layer | Current | After AWS Migration |
-|---|---|---|
-| Frontend | Next.js 14 + Vercel | Same |
-| Backend | NestJS 11 + Railway | AWS ECS or EC2 |
-| Database | Supabase PostgreSQL | AWS RDS PostgreSQL |
-| Image Storage | Supabase Storage | AWS S3 + CloudFront |
-| Email | AWS SES | Same |
-| Scheduler | GitHub Actions cron | Same or EventBridge |
-| AI | Claude API (claude-sonnet-4-5) | Same |
-| Color Extraction | Canvas API (browser) | Same |
-
----
-
-## 8. Spec Extraction Prompt (starting point for Week 2 Day 4)
+## 4. Spec Extraction Prompt
 
 ### System Prompt
 ```
-You only speak JSON. Do not write text that isn't JSON.
-You are a UI spec extractor. Analyze the screenshot and return
-every visible UI element with exact specs.
+You only speak JSON. Do not write text that is not JSON.
+You are a UI spec extractor. Analyze the screenshot and return every visible UI element with exact specs.
 ```
 
 ### User Prompt
 ```
-Analyze this UI screenshot and extract all elements.
-Return ONLY this JSON structure, nothing else:
+Analyze this UI screenshot and extract all visible elements.
+Return ONLY this JSON:
 
 {
   "elements": [
     {
-      "id": "unique-id",
-      "type": "button|text|input|image|card|container|...",
-      "label": "visible text if any",
+      "id": "unique-slug-id",
+      "type": "button|text|input|image|card|container|icon|divider",
+      "label": "visible text or null",
       "position": { "x": 0, "y": 0, "width": 0, "height": 0 },
       "styles": {
-        "backgroundColor": "#HEX or transparent",
-        "color": "#HEX",
-        "fontSize": "Npx",
-        "fontWeight": "400|500|600|700",
-        "borderRadius": "Npx",
-        "padding": "top right bottom left",
-        "margin": "top right bottom left",
-        "border": "width style color or none",
+        "backgroundColor": "#HEX or transparent or null",
+        "color": "#HEX or null",
+        "fontSize": "Npx or null",
+        "fontWeight": "400|500|600|700|800 or null",
+        "borderRadius": "Npx or null",
+        "padding": "Npx Npx Npx Npx or null",
+        "margin": "Npx Npx Npx Npx or null",
+        "border": "Npx solid #HEX or none or null",
         "gap": "Npx or null"
       }
     }
@@ -331,14 +202,108 @@ Return ONLY this JSON structure, nothing else:
 }
 
 Rules:
-- All colors must be exact HEX codes
+- All colors must be exact HEX codes. If unsure → null (never guess)
 - All sizes in px
-- If unsure about a value, write null (never guess)
-- Position values are relative to image top-left corner
+- Position values relative to image top-left
+- Use null for any value you are not certain about
 ```
 
-### Key Principles
-- The `null` rule is most important — write null if unsure, never estimate
-- null values are filled by human using Canvas API (pixel picker)
-- Set temperature to 0.2 or below (keeps output consistent)
-- Cropping to individual elements before sending improves accuracy
+**Key:** null values are filled by human via Canvas API color picker in browser.
+Temperature: 0.2 or below.
+
+---
+
+## 5. Frontend Overlay Rendering
+
+Canvas/SVG overlay renders on top of the original screenshot image in the browser.
+Each element shows:
+- **Bounding box**: colored border around element boundaries
+- **Element ID**: label in top-left corner of bounding box
+- **CSS values**: key specs shown as callout labels (fontSize, padding, color, etc.)
+- **Null highlight**: null values highlighted in red so user knows what to fix
+- **Click-to-edit**: clicking any label opens an inline input to update the value
+- **Canvas API color**: when clicking a null color, opens a color picker that samples from original image
+
+Export: `canvas.toBlob()` → clipboard (`navigator.clipboard.write()`) or `<a download>` for file save.
+
+---
+
+## 6. Agent Task Schedule
+
+### Start: May 24, 2026 (Brisbane AEST). Runs daily including weekends.
+
+```
+Week 1 (May 24-28) — Infrastructure
+Day 1 May 24: Monorepo root (package.json, lerna, tsconfig, eslint, .env.example)
+Day 2 May 25: Backend boilerplate (main.ts, AppModule, HealthModule) + Frontend skeleton
+Day 3 May 26: packages/prisma + packages/utils (GenericAssignDto, ApiConfigService, GenericService)
+Day 4 May 27: Backend global infra (GlobalExceptionFilter, LoggerMiddleware, ConfigSchemaValidation, open-api)
+Day 5 May 28: IStorageService + SupabaseStorageService + FileModule
+
+Week 2 (May 29-Jun 2) — Core Feature
+Day 1 May 29: SpecExtractionModule skeleton (controller, service, DTOs)
+Day 2 May 30: Claude API integration (SpecExtractionService.extract())
+Day 3 May 31: Prompt tuning + error handling
+Day 4 Jun 1:  E2E: upload image → extract → verify JSON response
+Day 5 Jun 2:  Polish + manual testing
+
+Week 3 (Jun 3-7) — Frontend
+Day 1 Jun 3:  Next.js setup (App Router, Tailwind, types/spec.ts, lib/api.ts)
+Day 2 Jun 4:  ScreenshotUploader + upload flow
+Day 3 Jun 5:  Canvas/SVG overlay rendering (bounding boxes, labels, CSS values, null highlights)
+Day 4 Jun 6:  Click-to-edit + Canvas API color extraction
+Day 5 Jun 7:  Copy Image + Download + full E2E
+```
+
+### Checkpoints (human must verify before next week)
+```
+End of Week 1 (May 28): npm run start:dev works + /api/v1/health → 200 + POST /file/upload works
+End of Week 2 (Jun 2):  POST /api/v1/spec/extract → returns valid JSON spec (CRITICAL)
+End of Week 3 (Jun 7):  Full flow: upload → overlay → edit → copy/download
+```
+
+---
+
+## 7. GitHub Actions Schedule (Brisbane AEST = UTC+10)
+
+```yaml
+feature-agent.yml: "0 23 * * *"   # 9am Brisbane (UTC+10 = 23:00 UTC prev day)
+bug-agent.yml:     "0 4 * * *"    # 2pm Brisbane (UTC+10 = 04:00 UTC)
+review-agent.yml:  "0 8 * * *"    # 6pm Brisbane (UTC+10 = 08:00 UTC)
+# All run every day including weekends
+```
+
+---
+
+## 8. Monitoring
+
+Review Agent creates a PR for each feat/* branch after the Feature Agent runs.
+Check GitHub PRs daily at 6pm Brisbane to see what was completed.
+Each PR description includes a summary of what was implemented.
+
+---
+
+## 9. Deployment Notes (manual steps — not automated)
+
+### Railway (Backend)
+- Set health check path to `/api/v1/health` in Railway dashboard → Settings → Health Check Path
+- Run `npm run prisma:generate` before `npm run build` in Railway's build command (Prisma client must be generated first)
+  - Build command: `npm run prisma:generate && npm run build`
+
+### Vercel (Frontend)
+- Add environment variable `NEXT_PUBLIC_API_URL` = your Railway backend URL (e.g. `https://your-app.railway.app`) in Vercel dashboard → Settings → Environment Variables
+- Also add `NEXT_PUBLIC_API_URL` as a GitHub Secret if CI builds the frontend
+
+---
+
+## 9. Tech Stack
+
+| Layer | Current | After AWS Migration |
+|---|---|---|
+| Frontend | Next.js 14 + Vercel | Same |
+| Backend | NestJS 11 + Railway | AWS ECS/EC2 |
+| Image Storage | Supabase Storage | AWS S3 + CloudFront |
+| DB | — (stateless MVP) | AWS RDS PostgreSQL |
+| AI | Claude API claude-sonnet-4-6 | Same |
+| Overlay Rendering | Browser Canvas/SVG | Same |
+| Color Extraction | Canvas API (browser) | Same |
