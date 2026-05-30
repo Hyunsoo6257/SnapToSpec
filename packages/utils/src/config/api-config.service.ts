@@ -14,7 +14,7 @@ export class ApiConfigService {
   }
 
   get applicationPort(): number {
-    return Number(this.configService.get('APPLICATION_PORT') ?? 3000);
+    return Number(process.env.PORT ?? this.configService.get('APPLICATION_PORT') ?? 3000);
   }
 
   get projectName(): string {
