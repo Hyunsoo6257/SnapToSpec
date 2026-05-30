@@ -15,6 +15,7 @@ export class SupabaseStorageService implements IStorageService {
     this.client = createClient(
       configService.getOrThrow<string>('SUPABASE_URL'),
       configService.getOrThrow<string>('SUPABASE_SERVICE_ROLE_KEY'),
+      { realtime: { params: { eventsPerSecond: -1 } } },
     );
   }
 
