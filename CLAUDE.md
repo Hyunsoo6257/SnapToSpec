@@ -164,10 +164,9 @@ test: add or update tests
 | `@Validator.IsULID()` etc. | `class-validator` built-ins (`@IsUUID()`, `@IsEmail()` etc.) |
 
 ## Branch Strategy
-- `main`: production (manual merge only, weekly)
-- `dev`: always latest (Review Agent merges daily)
-- `feat/*`: Feature Agent work branches
-- `fix/*`: Bug Agent work branches
+- `main`: default branch — QA Agent merges feat/* here after all checks pass
+- `feat/*`: Feature Agent daily work branches (merged to main by QA Agent)
+- Never push directly to main
 
 ## Current Development Phase
 Phase 1 (Week 1-3): Core feature prototype

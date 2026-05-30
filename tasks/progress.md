@@ -1,8 +1,7 @@
 # Agent Progress
 
-Feature Agent와 Bug Agent가 이 파일을 읽고 쓴다.
-Review Agent가 merge 후 ✅로 업데이트한다.
-Bug Agent가 FAIL 감지 시 ❌ BLOCKED로 업데이트한다.
+Feature Agent writes code and updates this file.
+QA Agent tests, fixes, and merges branches — updates status to MERGED or BLOCKED.
 
 ---
 
@@ -15,8 +14,9 @@ Bug Agent가 FAIL 감지 시 ❌ BLOCKED로 업데이트한다.
 | week1-day3 | 2026-05-26 | ✅ MERGED | — |
 | week1-day4 | 2026-05-27 | ✅ MERGED | — |
 | week1-day5 | 2026-05-28 | ✅ MERGED | — |
-| week2-day1 | — | ⏳ PENDING | — |
-| week2-day2 | — | ⏳ PENDING | — |
+| week2-day1 | — | ⏭ SKIPPED | covered by catchup-2 |
+| week2-day2 | — | ⏭ SKIPPED | covered by catchup-2 |
+| catchup-2 | — | ⏳ PENDING | week2-day1 + week2-day2 |
 | week2-day3 | — | ⏳ PENDING | — |
 | week2-day4 | — | ⏳ PENDING | — |
 | week2-day5 | — | ⏳ PENDING | — |
@@ -29,8 +29,9 @@ Bug Agent가 FAIL 감지 시 ❌ BLOCKED로 업데이트한다.
 ---
 
 ## Statuses
-- ⏳ PENDING — 아직 시작 안 됨
-- 🔄 IN PROGRESS — Feature Agent가 작업 중
-- 👀 IN REVIEW — Review Agent 검토 중
-- ✅ MERGED — dev에 머지 완료
-- ❌ BLOCKED — Bug Agent가 실패 감지, 다음 task 진행 불가
+- ⏳ PENDING — not started
+- 🔄 IN PROGRESS — Feature Agent working
+- 👀 IN REVIEW — QA Agent reviewing
+- ✅ MERGED — merged to main
+- ❌ BLOCKED — QA Agent could not fix, human intervention required
+- ⏭ SKIPPED — replaced by a catch-up task

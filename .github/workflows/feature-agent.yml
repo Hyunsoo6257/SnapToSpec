@@ -12,10 +12,10 @@ jobs:
       pull-requests: write
 
     steps:
-      - name: Checkout dev branch
+      - name: Checkout main branch
         uses: actions/checkout@v4
         with:
-          ref: dev
+          ref: main
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -73,10 +73,16 @@ jobs:
           FRONTEND_BASE_URL: ${{ secrets.FRONTEND_BASE_URL }}
         run: |
           TODAY=$(TZ="Australia/Brisbane" date +%Y-%m-%d)
-          claude --dangerously-skip-permissions --max-turns 80 -p "
+          claude --dangerously-skip-permissions --max-turns 100 -p "
           Read CLAUDE.md and PROJECT_PLAN.md first.
           Read tasks/progress.md to understand current state.
 
+          STEP 1 — Check for pending catch-up tasks:
+          Look at tasks/progress.md for any row where the task name starts with 'catchup-' and status is PENDING.
+          If one exists, run that task file (e.g. tasks/catchup-1.md) instead of the date-based schedule below.
+          Mark that catchup task as IN PROGRESS when starting, IN REVIEW when done.
+
+          STEP 2 — If no pending catch-up tasks, use date-based schedule:
           Today is $TODAY (Brisbane AEST).
           Task schedule:
             Week 1: 2026-05-24=day1, 2026-05-25=day2, 2026-05-26=day3, 2026-05-27=day4, 2026-05-28=day5
@@ -84,7 +90,7 @@ jobs:
             Week 3: 2026-06-03=day1, 2026-06-04=day2, 2026-06-05=day3, 2026-06-06=day4, 2026-06-07=day5
 
           Find today's week and day number from the schedule above.
-          Read the corresponding task file (e.g. tasks/week1-day1.md).
+          Read the corresponding task file (e.g. tasks/week2-day3.md).
           Execute the task completely following all rules in CLAUDE.md.
 
           When starting: update tasks/progress.md — mark today's task as 🔄 IN PROGRESS.
@@ -93,12 +99,12 @@ jobs:
           Commit all changes (including progress.md update) with the message specified in the task file.
           All output (commit messages, comments) must be in English.
           Do NOT push — the workflow will push for you.
-          " || true
+          "
 
       - name: Push branch
         if: env.BLOCKED == 'false' && env.BRANCH_EXISTS == 'false'
         run: |
-          if git log origin/dev..$BRANCH 2>/dev/null | grep -q .; then
+          if git log origin/main..$BRANCH 2>/dev/null | grep -q .; then
             git push origin $BRANCH
           else
             echo "No new commits on $BRANCH, skipping push"
