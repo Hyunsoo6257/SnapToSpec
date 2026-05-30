@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { WebSocket as WsWebSocket } from 'ws';
 
 import { IStorageService } from './storage.interface';
 
@@ -15,7 +16,8 @@ export class SupabaseStorageService implements IStorageService {
     this.client = createClient(
       configService.getOrThrow<string>('SUPABASE_URL'),
       configService.getOrThrow<string>('SUPABASE_SERVICE_ROLE_KEY'),
-      { realtime: { params: { eventsPerSecond: -1 } } },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      { realtime: { transport: WsWebSocket as any } },
     );
   }
 
