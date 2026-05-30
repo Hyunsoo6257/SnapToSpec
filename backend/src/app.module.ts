@@ -5,6 +5,7 @@ import * as path from 'path';
 
 import { FileModule } from './module/file/file.module';
 import { HealthCheckModule } from './module/health-check/health-check.module';
+import { SpecExtractionModule } from './module/spec-extraction/spec-extraction.module';
 import ConfigSchemaValidation from './shared/config-schema-validation';
 import { LoggerMiddleware } from './shared/middleware/logger.middleware';
 
@@ -18,6 +19,7 @@ import { LoggerMiddleware } from './shared/middleware/logger.middleware';
     }),
     HealthCheckModule,
     FileModule,
+    SpecExtractionModule,
   ],
   providers: [ApiConfigService],
   exports: [ApiConfigService],
