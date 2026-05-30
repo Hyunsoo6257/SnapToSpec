@@ -81,9 +81,37 @@ export class SpecElementDto extends GenericAssignDto<SpecElementDto> {
   @ApiProperty()
   id!: string;
 
-  @IsEnum(['button', 'text', 'input', 'image', 'card', 'container', 'icon', 'divider'])
-  @ApiProperty({ enum: ['button', 'text', 'input', 'image', 'card', 'container', 'icon', 'divider'] })
-  type!: 'button' | 'text' | 'input' | 'image' | 'card' | 'container' | 'icon' | 'divider';
+  @IsEnum([
+    'button',
+    'text',
+    'input',
+    'image',
+    'card',
+    'container',
+    'icon',
+    'divider',
+  ])
+  @ApiProperty({
+    enum: [
+      'button',
+      'text',
+      'input',
+      'image',
+      'card',
+      'container',
+      'icon',
+      'divider',
+    ],
+  })
+  type!:
+    | 'button'
+    | 'text'
+    | 'input'
+    | 'image'
+    | 'card'
+    | 'container'
+    | 'icon'
+    | 'divider';
 
   @IsString()
   @IsOptional()

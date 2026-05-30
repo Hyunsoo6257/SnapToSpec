@@ -5,6 +5,8 @@ import {
   InternalServerErrorException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { plainToInstance } from 'class-transformer';
+import { validate } from 'class-validator';
 import { ExtractRequestDto } from './dto/extract-request.dto';
 import { ExtractResultDto } from './dto/extract-result.dto';
 
@@ -16,32 +18,79 @@ export class SpecExtractionService {
   constructor(private readonly configService: ConfigService) {
     this.anthropic = new Anthropic({
       apiKey: configService.getOrThrow<string>('ANTHROPIC_API_KEY'),
+      timeout: 60000, // 60 second timeout — Claude vision calls can be slow
     });
   }
 
   async extract(dto: ExtractRequestDto): Promise<ExtractResultDto> {
     this.logger.log(`Extracting spec from image: ${dto.imageUrl}`);
 
-    const response = await this.anthropic.messages.create({
-      model: 'claude-sonnet-4-6',
-      max_tokens: 4096,
-      temperature: 0.2,
-      system: `You only speak JSON. Do not write text that is not JSON.
+    this.warnIfUnexpectedHost(dto.imageUrl);
+
+    const rawText = await this.requestCompletion(dto);
+    const parsed = this.parseJson(rawText);
+    const result = await this.validateResult(parsed);
+
+    if (result.elements.length === 0) {
+      // Not an error — the image may simply contain no UI elements.
+      this.logger.warn(`No elements extracted from image: ${dto.imageUrl}`);
+    }
+
+    this.logger.log(
+      `Extracted ${result.elements.length} element(s) from image: ${dto.imageUrl}`,
+    );
+
+    return result;
+  }
+
+  /**
+   * For MVP we accept any valid URL (the DTO already enforces URL format).
+   * We only warn when the image is not served from the configured Supabase
+   * Storage host, so unexpected sources are visible in the logs.
+   */
+  private warnIfUnexpectedHost(imageUrl: string): void {
+    const supabaseUrl = this.configService.get<string>('SUPABASE_URL');
+    if (!supabaseUrl) {
+      return;
+    }
+
+    try {
+      const expectedHost = new URL(supabaseUrl).host;
+      const actualHost = new URL(imageUrl).host;
+      if (actualHost !== expectedHost) {
+        this.logger.warn(
+          `imageUrl host "${actualHost}" is not the expected Supabase host "${expectedHost}"`,
+        );
+      }
+    } catch {
+      // URL format is already validated by the DTO; ignore parse issues here.
+    }
+  }
+
+  private async requestCompletion(dto: ExtractRequestDto): Promise<string> {
+    let response: Anthropic.Messages.Message;
+
+    try {
+      response = await this.anthropic.messages.create({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 4096,
+        temperature: 0.2,
+        system: `You only speak JSON. Do not write text that is not JSON.
 You are a UI spec extractor. Analyze the screenshot and return every visible UI element with exact specs.`,
-      messages: [
-        {
-          role: 'user',
-          content: [
-            {
-              type: 'image',
-              source: {
-                type: 'url',
-                url: dto.imageUrl,
+        messages: [
+          {
+            role: 'user',
+            content: [
+              {
+                type: 'image',
+                source: {
+                  type: 'url',
+                  url: dto.imageUrl,
+                },
               },
-            },
-            {
-              type: 'text',
-              text: `Analyze this UI screenshot and extract all visible elements.
+              {
+                type: 'text',
+                text: `Analyze this UI screenshot and extract all visible elements.
 Return ONLY this JSON structure:
 
 {
@@ -70,34 +119,63 @@ Rules:
 - All colors must be exact HEX codes. If unsure → null (never guess)
 - All sizes in px
 - Position values relative to image top-left
-- If unsure about any value → null`,
-            },
-          ],
-        },
-      ],
-    });
+- If unsure about any value → null
+- If the image contains no UI elements, return { "elements": [] }`,
+              },
+            ],
+          },
+        ],
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.error(`Claude API request failed: ${message}`);
+      throw new InternalServerErrorException(
+        'Failed to reach Claude API for spec extraction',
+      );
+    }
 
     const content = response.content[0];
-    if (content.type !== 'text') {
+    if (!content || content.type !== 'text') {
+      this.logger.error('Claude response did not contain a text block');
       throw new InternalServerErrorException('Unexpected Claude response type');
     }
 
-    let rawText = content.text.trim();
-    if (rawText.startsWith('```')) {
-      rawText = rawText
+    return content.text.trim();
+  }
+
+  private parseJson(rawText: string): unknown {
+    let text = rawText;
+    if (text.startsWith('```')) {
+      text = text
         .replace(/^```(?:json)?\n?/, '')
         .replace(/\n?```$/, '')
         .trim();
     }
 
-    let parsed: unknown;
     try {
-      parsed = JSON.parse(rawText);
+      return JSON.parse(text);
     } catch {
-      this.logger.error(`Claude returned non-JSON: ${rawText.slice(0, 200)}`);
+      this.logger.error(`Claude returned non-JSON: ${text.slice(0, 200)}`);
       throw new InternalServerErrorException('Claude returned invalid JSON');
     }
+  }
 
-    return new ExtractResultDto(parsed as ExtractResultDto);
+  private async validateResult(parsed: unknown): Promise<ExtractResultDto> {
+    const result = plainToInstance(ExtractResultDto, parsed);
+    const errors = await validate(result, {
+      whitelist: true,
+      forbidNonWhitelisted: false,
+    });
+
+    if (errors.length > 0) {
+      this.logger.error(
+        `Claude response failed validation: ${JSON.stringify(errors)}`,
+      );
+      throw new InternalServerErrorException(
+        'Claude returned unexpected spec structure',
+      );
+    }
+
+    return result;
   }
 }
