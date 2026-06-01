@@ -19,7 +19,7 @@ QA Agent tests, fixes, and merges branches — updates status to MERGED or BLOCK
 | catchup-2 | 2026-05-30 | ✅ MERGED | week2-day1 + week2-day2 |
 | week2-day3 | 2026-05-31 | ✅ MERGED | — |
 | week2-day4 | — | ⏳ PENDING | — |
-| week2-day5 | — | ⏳ PENDING | — |
+| week2-day5 | 2026-06-02 | 👀 IN REVIEW | — |
 | week3-day1 | — | ⏳ PENDING | — |
 | week3-day2 | — | ⏳ PENDING | — |
 | week3-day3 | — | ⏳ PENDING | — |
