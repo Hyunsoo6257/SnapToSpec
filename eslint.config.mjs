@@ -41,7 +41,11 @@ export default [
       'no-console': 'error',
       '@typescript-eslint/no-unused-vars': [
         'error',
-        { ignoreRestSiblings: true },
+        {
+          ignoreRestSiblings: true,
+          argsIgnorePattern: '^_',
+          varsIgnorePattern: '^_',
+        },
       ],
       'prettier/prettier': 'error',
     },
