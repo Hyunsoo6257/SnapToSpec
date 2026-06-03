@@ -55,10 +55,31 @@ jobs:
         if: env.BLOCKED == 'false' && env.BRANCH_EXISTS == 'false'
         run: npm install -g @anthropic-ai/claude-code
 
+      - name: Find base branch
+        if: env.BLOCKED == 'false' && env.BRANCH_EXISTS == 'false'
+        run: |
+          # Use the latest unmerged feat/* branch as base (if any), otherwise main
+          LATEST_FEAT=$(git branch -r --sort=-committerdate | grep 'origin/feat/' | head -1 | xargs)
+          if [ -n "$LATEST_FEAT" ]; then
+            # Check if it's already merged into main
+            FEAT_SHA=$(git rev-parse $LATEST_FEAT)
+            MAIN_SHA=$(git rev-parse origin/main)
+            if git merge-base --is-ancestor $FEAT_SHA $MAIN_SHA 2>/dev/null; then
+              echo "BASE_BRANCH=main" >> $GITHUB_ENV
+              echo "Latest feat branch is already merged — using main as base"
+            else
+              echo "BASE_BRANCH=$LATEST_FEAT" >> $GITHUB_ENV
+              echo "Using unmerged $LATEST_FEAT as base"
+            fi
+          else
+            echo "BASE_BRANCH=main" >> $GITHUB_ENV
+            echo "No feat branches found — using main as base"
+          fi
+
       - name: Create feature branch
         if: env.BLOCKED == 'false' && env.BRANCH_EXISTS == 'false'
         run: |
-          git checkout -b $BRANCH
+          git checkout -b $BRANCH $BASE_BRANCH
 
       - name: Run Feature Agent
         if: env.BLOCKED == 'false' && env.BRANCH_EXISTS == 'false'
