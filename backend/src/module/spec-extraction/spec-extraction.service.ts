@@ -73,7 +73,7 @@ export class SpecExtractionService {
     try {
       response = await this.anthropic.messages.create({
         model: 'claude-sonnet-4-6',
-        max_tokens: 4096,
+        max_tokens: 8192,
         temperature: 0.2,
         system: `You only speak JSON. Do not write text that is not JSON.
 You are a UI spec extractor. Analyze the screenshot and return every visible UI element with exact specs.`,
