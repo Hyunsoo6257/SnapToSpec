@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { ScreenshotUploader } from '@/components/upload/ScreenshotUploader';
+import { SpecOverlay } from '@/components/editor/SpecOverlay';
 import { extractSpec } from '@/lib/api';
 import type { SpecResult } from '@/types/spec';
 
@@ -52,13 +53,30 @@ export default function EditorPage() {
 
       {spec && imageUrl && (
         <div className="mt-8">
-          <p className="text-green-600 font-medium">
-            ✓ Extracted {spec.elements.length} elements — overlay coming in Day
-            3
+          <p className="text-green-600 font-medium mb-4">
+            ✓ Extracted {spec.elements.length} elements
           </p>
-          <pre className="mt-4 p-4 bg-gray-100 rounded-lg text-xs overflow-auto max-h-64">
-            {JSON.stringify(spec, null, 2)}
-          </pre>
+          <SpecOverlay
+            imageUrl={imageUrl}
+            spec={spec}
+            onElementUpdate={(id, field, value) => {
+              setSpec((prev) =>
+                prev
+                  ? {
+                      ...prev,
+                      elements: prev.elements.map((el) =>
+                        el.id === id
+                          ? {
+                              ...el,
+                              styles: { ...el.styles, [field]: value },
+                            }
+                          : el,
+                      ),
+                    }
+                  : null,
+              );
+            }}
+          />
         </div>
       )}
     </main>
