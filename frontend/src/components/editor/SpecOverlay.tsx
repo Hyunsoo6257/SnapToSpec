@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import type { SpecElement, SpecResult, SpecStyles } from '@/types/spec';
+import { useCanvasColor } from '@/hooks/useCanvasColor';
 import { ValueEditorPopover } from './ValueEditor';
 
 interface Props {
@@ -24,15 +25,19 @@ export function SpecOverlay({ imageUrl, spec, onElementUpdate }: Props) {
   );
   const [editField, setEditField] = useState<string | null>(null);
   const [imageSize, setImageSize] = useState({ width: 800, height: 600 });
+  const { isPickingColor, startColorPick, handleImageClick, imageRef } =
+    useCanvasColor();
 
   return (
     <div className="relative inline-block">
       {/* Original screenshot */}
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
+        ref={imageRef}
         src={imageUrl}
         alt="Screenshot"
-        className="block max-w-full"
+        className={`block max-w-full ${isPickingColor ? 'cursor-crosshair' : ''}`}
+        onClick={handleImageClick}
         onLoad={(e) =>
           setImageSize({
             width: e.currentTarget.naturalWidth,
@@ -65,6 +70,8 @@ export function SpecOverlay({ imageUrl, spec, onElementUpdate }: Props) {
         <ValueEditorPopover
           element={selectedElement}
           field={editField}
+          isPickingColor={isPickingColor}
+          onStartColorPick={startColorPick}
           onSave={(value) => {
             onElementUpdate(selectedElement.id, editField, value);
             setSelectedElement(null);
@@ -92,7 +99,8 @@ function ElementAnnotation({
   const { x, y, width, height } = element.position;
 
   // Render labels to the right if space allows, otherwise to the left
-  const labelX = x + width + 8 + 120 > imageSize.width ? x - 130 : x + width + 8;
+  const labelX =
+    x + width + 8 + 120 > imageSize.width ? x - 130 : x + width + 8;
 
   return (
     <g>
