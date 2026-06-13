@@ -68,10 +68,10 @@ export class SpecExtractionService {
   }
 
   private async requestCompletion(dto: ExtractRequestDto): Promise<string> {
-    let response: Anthropic.Messages.Message;
-
     try {
-      response = await this.anthropic.messages.create({
+      let fullText = '';
+
+      const stream = await this.anthropic.messages.stream({
         model: 'claude-sonnet-4-6',
         max_tokens: 8192,
         temperature: 0.2,
@@ -126,6 +126,17 @@ Rules:
           },
         ],
       });
+
+      for await (const chunk of stream) {
+        if (
+          chunk.type === 'content_block_delta' &&
+          chunk.delta.type === 'text_delta'
+        ) {
+          fullText += chunk.delta.text;
+        }
+      }
+
+      return fullText.trim();
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       this.logger.error(`Claude API request failed: ${message}`);
@@ -133,14 +144,6 @@ Rules:
         'Failed to reach Claude API for spec extraction',
       );
     }
-
-    const content = response.content[0];
-    if (!content || content.type !== 'text') {
-      this.logger.error('Claude response did not contain a text block');
-      throw new InternalServerErrorException('Unexpected Claude response type');
-    }
-
-    return content.text.trim();
   }
 
   private parseJson(rawText: string): unknown {
