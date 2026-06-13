@@ -87,11 +87,9 @@ export class SpecExtractionService {
   private async requestCompletion(dto: ExtractRequestDto): Promise<string> {
     try {
       const { data, mediaType } = await this.fetchImageAsBase64(dto.imageUrl);
-      let fullText = '';
-
-      const stream = await this.anthropic.messages.stream({
+      const stream = this.anthropic.messages.stream({
         model: 'claude-sonnet-4-6',
-        max_tokens: 8192,
+        max_tokens: 16000,
         temperature: 0.2,
         system: `You only speak JSON. Do not write text that is not JSON.
 You are a UI spec extractor. Analyze the screenshot and return every visible UI element with exact specs.`,
@@ -146,16 +144,13 @@ Rules:
         ],
       });
 
-      for await (const chunk of stream) {
-        if (
-          chunk.type === 'content_block_delta' &&
-          chunk.delta.type === 'text_delta'
-        ) {
-          fullText += chunk.delta.text;
-        }
+      const message = await stream.finalMessage();
+      const content = message.content[0];
+      if (!content || content.type !== 'text') {
+        throw new Error('Claude response did not contain a text block');
       }
 
-      return fullText.trim();
+      return content.text.trim();
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       this.logger.error(`Claude API request failed: ${message}`);
