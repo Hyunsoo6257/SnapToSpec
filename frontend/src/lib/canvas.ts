@@ -2,6 +2,47 @@
 
 import type { SpecResult } from '@/types/spec';
 
+const MAX_DIMENSION = 1920;
+
+/**
+ * Resize an image File to fit within MAX_DIMENSION x MAX_DIMENSION.
+ * Returns the original file unchanged if it's already within bounds.
+ * Used before upload to prevent Claude API timeouts on large images.
+ */
+export async function resizeImageIfNeeded(file: File): Promise<File> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    const objectUrl = URL.createObjectURL(file);
+
+    img.onload = () => {
+      URL.revokeObjectURL(objectUrl);
+      const { naturalWidth: w, naturalHeight: h } = img;
+
+      if (w <= MAX_DIMENSION && h <= MAX_DIMENSION) {
+        resolve(file);
+        return;
+      }
+
+      const scale = Math.min(MAX_DIMENSION / w, MAX_DIMENSION / h);
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(w * scale);
+      canvas.height = Math.round(h * scale);
+
+      const ctx = canvas.getContext('2d');
+      if (!ctx) { resolve(file); return; }
+
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      canvas.toBlob((blob) => {
+        if (!blob) { resolve(file); return; }
+        resolve(new File([blob], file.name, { type: 'image/png' }));
+      }, 'image/png', 0.92);
+    };
+
+    img.onerror = () => { URL.revokeObjectURL(objectUrl); resolve(file); };
+    img.src = objectUrl;
+  });
+}
+
 /**
  * Sample the exact pixel color from an image at given coordinates.
  * Used to fill null color values without AI estimation.

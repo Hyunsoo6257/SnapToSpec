@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from 'react';
 import { uploadScreenshot } from '@/lib/api';
+import { resizeImageIfNeeded } from '@/lib/canvas';
 
 interface Props {
   onUploadComplete: (imageUrl: string, file: File) => void;
@@ -23,8 +24,9 @@ export function ScreenshotUploader({ onUploadComplete }: Props) {
       setError(null);
 
       try {
-        const { imageUrl } = await uploadScreenshot(file);
-        onUploadComplete(imageUrl, file);
+        const resized = await resizeImageIfNeeded(file);
+        const { imageUrl } = await uploadScreenshot(resized);
+        onUploadComplete(imageUrl, resized);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Upload failed');
       } finally {
