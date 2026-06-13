@@ -67,8 +67,26 @@ export class SpecExtractionService {
     }
   }
 
+  private async fetchImageAsBase64(
+    imageUrl: string,
+  ): Promise<{ data: string; mediaType: 'image/png' | 'image/jpeg' | 'image/webp' }> {
+    const response = await fetch(imageUrl);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch image: ${response.status}`);
+    }
+    const contentType = response.headers.get('content-type') ?? 'image/png';
+    const mediaType = (
+      ['image/png', 'image/jpeg', 'image/webp'].includes(contentType)
+        ? contentType
+        : 'image/png'
+    ) as 'image/png' | 'image/jpeg' | 'image/webp';
+    const buffer = await response.arrayBuffer();
+    return { data: Buffer.from(buffer).toString('base64'), mediaType };
+  }
+
   private async requestCompletion(dto: ExtractRequestDto): Promise<string> {
     try {
+      const { data, mediaType } = await this.fetchImageAsBase64(dto.imageUrl);
       let fullText = '';
 
       const stream = await this.anthropic.messages.stream({
@@ -84,8 +102,9 @@ You are a UI spec extractor. Analyze the screenshot and return every visible UI 
               {
                 type: 'image',
                 source: {
-                  type: 'url',
-                  url: dto.imageUrl,
+                  type: 'base64',
+                  media_type: mediaType,
+                  data,
                 },
               },
               {
