@@ -2,7 +2,9 @@
 
 import { useState } from 'react';
 import { ScreenshotUploader } from '@/components/upload/ScreenshotUploader';
+import { SpecOverlay } from '@/components/editor/SpecOverlay';
 import { extractSpec } from '@/lib/api';
+import { useSpecExport } from '@/hooks/useSpecExport';
 import type { SpecResult } from '@/types/spec';
 
 export default function EditorPage() {
@@ -11,6 +13,10 @@ export default function EditorPage() {
   const [spec, setSpec] = useState<SpecResult | null>(null);
   const [isExtracting, setIsExtracting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { copyToClipboard, downloadImage, isExporting } = useSpecExport(
+    imageUrl,
+    spec,
+  );
 
   const handleUploadComplete = async (url: string, file: File) => {
     setImageUrl(url);
@@ -52,13 +58,58 @@ export default function EditorPage() {
 
       {spec && imageUrl && (
         <div className="mt-8">
-          <p className="text-green-600 font-medium">
-            ✓ Extracted {spec.elements.length} elements — overlay coming in Day
-            3
+          <p className="text-green-600 font-medium mb-4">
+            ✓ Extracted {spec.elements.length} elements
           </p>
-          <pre className="mt-4 p-4 bg-gray-100 rounded-lg text-xs overflow-auto max-h-64">
-            {JSON.stringify(spec, null, 2)}
-          </pre>
+          <SpecOverlay
+            imageUrl={imageUrl}
+            spec={spec}
+            onElementUpdate={(id, field, value) => {
+              setSpec((prev) =>
+                prev
+                  ? {
+                      ...prev,
+                      elements: prev.elements.map((el) =>
+                        el.id === id
+                          ? {
+                              ...el,
+                              styles: { ...el.styles, [field]: value },
+                            }
+                          : el,
+                      ),
+                    }
+                  : null,
+              );
+            }}
+          />
+
+          <div className="mt-6 flex gap-4">
+            <button
+              onClick={copyToClipboard}
+              disabled={isExporting}
+              className="px-6 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50"
+            >
+              {isExporting ? 'Processing...' : 'Copy Image'}
+            </button>
+            <button
+              onClick={downloadImage}
+              disabled={isExporting}
+              className="px-6 py-3 bg-gray-700 text-white rounded-lg font-medium hover:bg-gray-800 disabled:opacity-50"
+            >
+              Download PNG
+            </button>
+            <button
+              onClick={() => {
+                setImageUrl(null);
+                setImageFile(null);
+                setSpec(null);
+                setError(null);
+              }}
+              className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50"
+            >
+              Start Over
+            </button>
+          </div>
         </div>
       )}
     </main>
