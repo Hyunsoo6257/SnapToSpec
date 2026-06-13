@@ -1,6 +1,8 @@
 name: QA Agent
 
 on:
+  schedule:
+    - cron: "0 1 * * *" # 매일 오전 11시 Brisbane AEST (Feature Agent 완료 후 2시간 뒤)
   workflow_dispatch:
 
 jobs:
@@ -26,8 +28,8 @@ jobs:
 
       - name: Configure git
         run: |
-          git config user.email "agent@snaptospec.com"
-          git config user.name "QA Agent"
+          git config user.email "162527916+Hyunsoo6257@users.noreply.github.com"
+          git config user.name "Hyunsoo6257"
 
       - name: Install Claude Code
         run: npm install -g @anthropic-ai/claude-code

@@ -21,10 +21,11 @@ QA Agent tests, fixes, and merges branches — updates status to MERGED or BLOCK
 | week2-day4 | 2026-06-01 | ✅ MERGED | — |
 | week2-day5 | 2026-06-02 | ✅ MERGED | cherry-picked from feat/agent-20260602 |
 | week3-day1 | 2026-06-03 | ✅ MERGED | cherry-picked from feat/agent-20260603 |
-| week3-day2 | 2026-06-04 | 👀 IN REVIEW | — |
-| week3-day3 | — | ⏳ PENDING | — |
-| week3-day4 | — | ⏳ PENDING | — |
-| week3-day5 | — | ⏳ PENDING | — |
+| week3-day2 | 2026-06-05 | ✅ MERGED | — |
+| week3-day3 | — | ⏭ SKIPPED | covered by catchup-3 |
+| week3-day4 | — | ⏭ SKIPPED | covered by catchup-3 |
+| week3-day5 | — | ⏭ SKIPPED | covered by catchup-3 |
+| catchup-3 | — | ⏳ PENDING | week3-day3 + week3-day4 + week3-day5 |
 
 ---
 

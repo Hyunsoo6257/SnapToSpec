@@ -1,6 +1,8 @@
 name: Feature Agent
 
 on:
+  schedule:
+    - cron: "0 23 * * *" # 매일 오전 9시 Brisbane AEST (UTC+10 = UTC 전날 23:00)
   workflow_dispatch:
 
 jobs:
@@ -26,8 +28,8 @@ jobs:
 
       - name: Configure git
         run: |
-          git config user.email "agent@snaptospec.com"
-          git config user.name "Feature Agent"
+          git config user.email "162527916+Hyunsoo6257@users.noreply.github.com"
+          git config user.name "Hyunsoo6257"
 
       - name: Check for BLOCKED status
         id: check_blocked
@@ -95,27 +97,19 @@ jobs:
         run: |
           TODAY=$(TZ="Australia/Brisbane" date +%Y-%m-%d)
           claude --dangerously-skip-permissions --max-turns 100 -p "
-          Read CLAUDE.md and PROJECT_PLAN.md first.
+          Read CLAUDE.md first.
           Read tasks/progress.md to understand current state.
 
-          STEP 1 — Check for pending catch-up tasks:
-          Look at tasks/progress.md for any row where the task name starts with 'catchup-' and status is PENDING.
-          If one exists, run that task file (e.g. tasks/catchup-1.md) instead of the date-based schedule below.
-          Mark that catchup task as IN PROGRESS when starting, IN REVIEW when done.
+          STEP 1 — Find the next task to run:
+          Look at tasks/progress.md for the first row where status is ⏳ PENDING.
+          That is today's task. The task name in that row (e.g. 'catchup-3', 'week2-day3') is the file to read: tasks/<task-name>.md.
+          If no PENDING tasks exist — exit immediately with message 'No pending tasks. All done!'.
 
-          STEP 2 — If no pending catch-up tasks, use date-based schedule:
-          Today is $TODAY (Brisbane AEST).
-          Task schedule:
-            Week 1: 2026-05-24=day1, 2026-05-25=day2, 2026-05-26=day3, 2026-05-27=day4, 2026-05-28=day5
-            Week 2: 2026-05-29=day1, 2026-05-30=day2, 2026-05-31=day3, 2026-06-01=day4, 2026-06-02=day5
-            Week 3: 2026-06-03=day1, 2026-06-04=day2, 2026-06-05=day3, 2026-06-06=day4, 2026-06-07=day5
+          STEP 2 — Execute the task:
+          Read the full task file and execute it completely following all rules in CLAUDE.md.
 
-          Find today's week and day number from the schedule above.
-          Read the corresponding task file (e.g. tasks/week2-day3.md).
-          Execute the task completely following all rules in CLAUDE.md.
-
-          When starting: update tasks/progress.md — mark today's task as 🔄 IN PROGRESS.
-          When done: update tasks/progress.md — mark today's task as 👀 IN REVIEW with today's date.
+          When starting: update tasks/progress.md — mark the task as 🔄 IN PROGRESS.
+          When done: update tasks/progress.md — mark the task as 👀 IN REVIEW with today's date ($TODAY Brisbane AEST).
 
           Commit all changes (including progress.md update) with the message specified in the task file.
           All output (commit messages, comments) must be in English.
