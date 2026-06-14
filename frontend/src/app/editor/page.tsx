@@ -1,17 +1,29 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ScreenshotUploader } from '@/components/upload/ScreenshotUploader';
 import { SpecOverlay } from '@/components/editor/SpecOverlay';
 import { extractSpec } from '@/lib/api';
 import { useSpecExport } from '@/hooks/useSpecExport';
-import type { SpecResult } from '@/types/spec';
+import { renderOverlayToCanvas, exportCanvasToBlob } from '@/lib/canvas';
+import type { SpecElement, SpecResult, SpecStyles } from '@/types/spec';
 
 const STORAGE_KEY = 'snaptospec_session';
+
+const ALL_STYLES: ReadonlyArray<keyof SpecStyles> = [
+  'backgroundColor', 'color', 'fontSize', 'fontWeight',
+  'borderRadius', 'padding', 'margin', 'border', 'gap',
+];
 
 interface SavedSession {
   imageUrl: string;
   spec: SpecResult;
+}
+
+interface HistoryEntry {
+  elementId: string;
+  field: string;
+  previousValue: string | null;
 }
 
 export default function EditorPage() {
@@ -20,9 +32,12 @@ export default function EditorPage() {
   const [isExtracting, setIsExtracting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pendingUrl, setPendingUrl] = useState<string | null>(null);
+  const [showContainers, setShowContainers] = useState(false);
+  const [history, setHistory] = useState<HistoryEntry[]>([]);
+  const [copyPromptDone, setCopyPromptDone] = useState(false);
   const { copyToClipboard, downloadImage, isExporting } = useSpecExport(imageUrl, spec);
+  const copyPromptTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Restore session from localStorage on mount
   useEffect(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
@@ -36,10 +51,15 @@ export default function EditorPage() {
     }
   }, []);
 
+  useEffect(() => {
+    return () => { if (copyPromptTimer.current) clearTimeout(copyPromptTimer.current); };
+  }, []);
+
   const runExtraction = async (url: string) => {
     setPendingUrl(url);
     setIsExtracting(true);
     setError(null);
+    setHistory([]);
     try {
       const result = await extractSpec(url);
       setSpec(result);
@@ -63,6 +83,9 @@ export default function EditorPage() {
   const handleElementUpdate = (id: string, field: string, value: string) => {
     setSpec((prev) => {
       if (!prev) return null;
+      const element = prev.elements.find((el) => el.id === id);
+      const previousValue = element ? (element.styles as unknown as Record<string, string | null>)[field] : null;
+      setHistory((h) => [...h, { elementId: id, field, previousValue }]);
       const updated = {
         ...prev,
         elements: prev.elements.map((el) =>
@@ -76,13 +99,73 @@ export default function EditorPage() {
     });
   };
 
+  const handleUndo = () => {
+    const last = history[history.length - 1];
+    if (!last) return;
+    setSpec((prev) => {
+      if (!prev) return null;
+      const updated = {
+        ...prev,
+        elements: prev.elements.map((el) =>
+          el.id === last.elementId
+            ? { ...el, styles: { ...el.styles, [last.field]: last.previousValue } }
+            : el,
+        ),
+      };
+      if (imageUrl) {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({ imageUrl, spec: updated }));
+      }
+      return updated;
+    });
+    setHistory((h) => h.slice(0, -1));
+  };
+
+  const handleCopyPrompt = async () => {
+    if (!spec || !imageUrl) return;
+    const lines = spec.elements
+      .filter((el) => el.type !== 'container')
+      .map((el) => {
+        const styles = ALL_STYLES
+          .map((f) => `${f}: ${el.styles[f] ?? 'null'}`)
+          .join(', ');
+        return `${el.id} (${el.type}): ${styles}`;
+      });
+    const text = `UI Spec:\n\n${lines.join('\n')}`;
+
+    try {
+      const canvas = await renderOverlayToCanvas(imageUrl, spec);
+      const blob = await exportCanvasToBlob(canvas);
+      await navigator.clipboard.write([
+        new ClipboardItem({
+          'text/plain': new Blob([text], { type: 'text/plain' }),
+          'image/png': blob,
+        }),
+      ]);
+    } catch {
+      // Fallback: copy text only
+      await navigator.clipboard.writeText(text);
+    }
+
+    setCopyPromptDone(true);
+    copyPromptTimer.current = setTimeout(() => setCopyPromptDone(false), 2000);
+  };
+
   const handleStartOver = () => {
     setImageUrl(null);
     setSpec(null);
     setError(null);
     setPendingUrl(null);
+    setHistory([]);
     localStorage.removeItem(STORAGE_KEY);
   };
+
+  const visibleElements = spec
+    ? showContainers ? spec.elements : spec.elements.filter((el) => el.type !== 'container')
+    : [];
+
+  const nullCount = visibleElements.reduce((acc, el) => {
+    return acc + ALL_STYLES.filter((f) => el.styles[f] === null).length;
+  }, 0);
 
   return (
     <main className="min-h-screen bg-gray-50 p-8">
@@ -103,17 +186,11 @@ export default function EditorPage() {
           <p className="font-medium mb-3">{error}</p>
           <div className="flex gap-3">
             {pendingUrl && (
-              <button
-                onClick={handleRetry}
-                className="px-4 py-2 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700"
-              >
+              <button onClick={handleRetry} className="px-4 py-2 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700">
                 Retry
               </button>
             )}
-            <button
-              onClick={handleStartOver}
-              className="px-4 py-2 border border-red-300 text-red-700 text-sm rounded-lg hover:bg-red-100"
-            >
+            <button onClick={handleStartOver} className="px-4 py-2 border border-red-300 text-red-700 text-sm rounded-lg hover:bg-red-100">
               Start Over
             </button>
           </div>
@@ -121,38 +198,62 @@ export default function EditorPage() {
       )}
 
       {spec && imageUrl && (
-        <div className="mt-8">
-          <p className="text-green-600 font-medium mb-4">
-            ✓ Extracted {spec.elements.length} elements — hover over elements to see specs
-          </p>
+        <div className="mt-6">
+          {/* Top bar */}
+          <div className="flex items-center gap-4 mb-4 flex-wrap">
+            <span className="text-sm text-gray-600">
+              {visibleElements.length} elements
+              {nullCount > 0 && <span className="text-red-500 ml-2">· {nullCount} null</span>}
+            </span>
+
+            <label className="flex items-center gap-1.5 text-sm text-gray-500 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={showContainers}
+                onChange={(e) => setShowContainers(e.target.checked)}
+                className="rounded"
+              />
+              Show containers
+            </label>
+
+            <div className="ml-auto flex gap-2 flex-wrap">
+              <button
+                onClick={handleCopyPrompt}
+                className="px-4 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700"
+              >
+                {copyPromptDone ? '✓ Copied!' : 'Copy Prompt'}
+              </button>
+              <button
+                onClick={copyToClipboard}
+                disabled={isExporting}
+                className="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:opacity-50"
+              >
+                {isExporting ? 'Processing...' : 'Copy Image'}
+              </button>
+              <button
+                onClick={downloadImage}
+                disabled={isExporting}
+                className="px-4 py-2 bg-gray-700 text-white text-sm rounded-lg hover:bg-gray-800 disabled:opacity-50"
+              >
+                Download PNG
+              </button>
+              <button
+                onClick={handleStartOver}
+                className="px-4 py-2 border border-gray-300 text-gray-700 text-sm rounded-lg hover:bg-gray-50"
+              >
+                Start Over
+              </button>
+            </div>
+          </div>
+
           <SpecOverlay
             imageUrl={imageUrl}
             spec={spec}
+            showContainers={showContainers}
             onElementUpdate={handleElementUpdate}
+            onUndo={handleUndo}
+            canUndo={history.length > 0}
           />
-
-          <div className="mt-6 flex gap-4">
-            <button
-              onClick={copyToClipboard}
-              disabled={isExporting}
-              className="px-6 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50"
-            >
-              {isExporting ? 'Processing...' : 'Copy Image'}
-            </button>
-            <button
-              onClick={downloadImage}
-              disabled={isExporting}
-              className="px-6 py-3 bg-gray-700 text-white rounded-lg font-medium hover:bg-gray-800 disabled:opacity-50"
-            >
-              Download PNG
-            </button>
-            <button
-              onClick={handleStartOver}
-              className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50"
-            >
-              Start Over
-            </button>
-          </div>
         </div>
       )}
     </main>
